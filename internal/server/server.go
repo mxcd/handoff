@@ -69,6 +69,10 @@ func (s *Server) RegisterRoutes() error {
 	protected.Use(apiKeyAuth())
 	s.ProtectedAPI = protected
 
+	// Session management routes (protected)
+	s.ProtectedAPI.POST("/sessions", s.createSessionHandler())
+	s.ProtectedAPI.GET("/sessions/:id", s.getSessionHandler())
+
 	// Static files are public (no middleware)
 	web.RegisterStaticFiles(s.Engine)
 	return nil
