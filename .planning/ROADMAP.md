@@ -13,7 +13,7 @@ Four phases deliver a working Handoff server: clean infrastructure and auth, the
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Clean Go server, infrastructure endpoints, API key auth, in-memory cache wired up
-- [ ] **Phase 2: Session Core** - Caller can create sessions, receive URLs, and retrieve results via poll or WebSocket
+- [x] **Phase 2: Session Core** - Caller can create sessions, receive URLs, and retrieve results via poll or WebSocket
 - [ ] **Phase 3: Phone UI and Actions** - Phone user can open a session URL, see the action UI, and complete photo or signature actions
 - [ ] **Phase 4: Client Library and Dev Tools** - Go client library in pkg/ and mock consumer server for end-to-end testing
 
@@ -51,7 +51,7 @@ Plans:
 - [x] 02-01: Session/result model, in-memory store via go-cache, TTL expiry and tombstones
 - [x] 02-02: Session creation (POST) and retrieval (GET) API with URL generation
 - [x] 02-03: Result polling, result submission, and file download endpoints
-- [ ] 02-04: Per-session WebSocket notifications for real-time result delivery
+- [x] 02-04: Per-session WebSocket notifications for real-time result delivery
 
 ### Phase 3: Phone UI and Actions
 **Goal**: A phone user can scan the QR code URL, see the correct action UI, and submit a completed photo or signature back to Handoff
@@ -92,6 +92,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-02-26 |
-| 2. Session Core | 3/4 | In progress | - |
+| 2. Session Core | 4/4 | Complete | 2026-02-26 |
 | 3. Phone UI and Actions | 0/4 | Not started | - |
 | 4. Client Library and Dev Tools | 0/2 | Not started | - |

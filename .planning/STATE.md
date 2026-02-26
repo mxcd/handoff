@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-26T20:31:19.852Z"
+last_updated: "2026-02-26T20:35:06.606Z"
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 2 of 4 (Session Core)
-Plan: 3 of 3 in current phase (plan 02-03 complete — phase complete)
+Plan: 4 of 4 in current phase (plan 02-04 complete — phase complete)
 Status: Phase 2 complete
-Last activity: 2026-02-26 — Plan 02-03 complete: result polling, submission, and download endpoints
+Last activity: 2026-02-26 — Plan 02-04 complete: WebSocket hub and per-session notifications
 
-Progress: [███████░░░] 75%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -41,10 +41,10 @@ Progress: [███████░░░] 75%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 8min | 3min |
-| 02-session-core | 3/3 | 13min | 4min |
+| 02-session-core | 4/4 | 15min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (5min), 01-03 (1min), 02-01 (7min), 02-02 (1min), 02-03 (5min)
+- Last 5 plans: 01-03 (1min), 02-01 (7min), 02-02 (1min), 02-03 (5min), 02-04 (2min)
 - Trend: —
 
 *Updated after each plan completion*
@@ -78,6 +78,8 @@ Recent decisions affecting current work:
 - [Phase 02-session-core]: 02-03: submitResultHandler is on public s.Engine (not ProtectedAPI) — session UUID provides 122-bit entropy as implicit auth
 - [Phase 02-session-core]: 02-03: StoreFile updated to 4-arg (adds contentType); GetFile returns *StoredFile — ContentType travels with data through cache
 - [Phase 02-session-core]: 02-03: Base64 decode tries StdEncoding then URLEncoding — handles both variants from different clients
+- [Phase 02-session-core]: 02-04: WS endpoint on Engine directly (not ProtectedAPI) — API key validated inline before upgrade to support query param auth
+- [Phase 02-session-core]: 02-04: Initial status_update sent after upgrade so subscriber never misses current state; Hub.Broadcast holds write lock across full fan-out
 
 ### Pending Todos
 
@@ -90,5 +92,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 02-03-PLAN.md — result polling, submission, and download endpoints (Phase 2 complete)
+Stopped at: Completed 02-04-PLAN.md — WebSocket hub and per-session notifications (Phase 2 complete)
 Resume file: None
