@@ -3,9 +3,11 @@ package server
 import (
 	"encoding/base64"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mxcd/handoff/internal/model"
+	"github.com/mxcd/handoff/internal/util"
 	"github.com/rs/zerolog/log"
 )
 
@@ -117,7 +119,41 @@ func (s *Server) submitResultHandler() gin.HandlerFunc {
 				}
 			}
 
-			if storeErr := s.Store.StoreFile(downloadID, decoded, item.ContentType, session.ResultTTL); storeErr != nil {
+			fileData := decoded
+			fileContentType := item.ContentType
+			fileFilename := item.Filename
+
+			// Convert to PDF if the session's output format requires it
+			if session.OutputFormat == model.OutputFormatPDF {
+				if strings.HasPrefix(item.ContentType, "image/svg") {
+					pdfBytes, pdfErr := util.SVGToPDF(decoded)
+					if pdfErr != nil {
+						log.Error().Err(pdfErr).Str("session_id", id).Msg("submit: SVG to PDF conversion failed")
+						jsonError(c, http.StatusInternalServerError, "PDF conversion failed")
+						return
+					}
+					fileData = pdfBytes
+					fileContentType = "application/pdf"
+					fileFilename = strings.TrimSuffix(item.Filename, ".svg") + ".pdf"
+				} else if strings.HasPrefix(item.ContentType, "image/") {
+					pdfBytes, pdfErr := util.ImageToPDF(decoded, item.ContentType)
+					if pdfErr != nil {
+						log.Error().Err(pdfErr).Str("session_id", id).Msg("submit: image to PDF conversion failed")
+						jsonError(c, http.StatusInternalServerError, "PDF conversion failed")
+						return
+					}
+					fileData = pdfBytes
+					fileContentType = "application/pdf"
+					// Replace image extension with .pdf
+					if idx := strings.LastIndex(item.Filename, "."); idx >= 0 {
+						fileFilename = item.Filename[:idx] + ".pdf"
+					} else {
+						fileFilename = item.Filename + ".pdf"
+					}
+				}
+			}
+
+			if storeErr := s.Store.StoreFile(downloadID, fileData, fileContentType, session.ResultTTL); storeErr != nil {
 				log.Error().Err(storeErr).Str("session_id", id).Str("download_id", downloadID).Msg("submit: failed to store file")
 				jsonError(c, http.StatusInternalServerError, "internal error")
 				return
@@ -125,8 +161,8 @@ func (s *Server) submitResultHandler() gin.HandlerFunc {
 
 			resultItems = append(resultItems, model.ResultItem{
 				DownloadID:  downloadID,
-				ContentType: item.ContentType,
-				Filename:    item.Filename,
+				ContentType: fileContentType,
+				Filename:    fileFilename,
 			})
 		}
 
