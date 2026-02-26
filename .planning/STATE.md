@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-02-26T20:36:26.734Z"
+status: in_progress
+last_updated: "2026-02-26T20:33:00.000Z"
 progress:
-  total_phases: 2
+  total_phases: 4
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 11
+  completed_plans: 8
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A calling backend can create a session, generate a QR code URL, and receive the completed action result (scan, photo, signature) — reliably and without requiring the calling app to build any mobile-facing UI.
-**Current focus:** Phase 2 - Session Core
+**Current focus:** Phase 3 - Phone UI and Actions
 
 ## Current Position
 
-Phase: 2 of 4 (Session Core)
-Plan: 4 of 4 in current phase (plan 02-04 complete — phase complete)
-Status: Phase 2 complete
-Last activity: 2026-02-26 — Plan 02-04 complete: WebSocket hub and per-session notifications
+Phase: 3 of 4 (Phone UI and Actions)
+Plan: 1 of 4 in current phase (plan 03-01 complete)
+Status: Phase 3 in progress
+Last activity: 2026-02-26 — Plan 03-01 complete: HTML template system and session page routing
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 73%
 
 ## Performance Metrics
 
@@ -42,9 +42,10 @@ Progress: [████████░░] 80%
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 8min | 3min |
 | 02-session-core | 4/4 | 15min | 4min |
+| 03-phone-ui-and-actions | 1/4 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (1min), 02-01 (7min), 02-02 (1min), 02-03 (5min), 02-04 (2min)
+- Last 5 plans: 02-02 (1min), 02-03 (5min), 02-04 (2min), 03-01 (2min)
 - Trend: —
 
 *Updated after each plan completion*
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [Phase 02-session-core]: 02-03: Base64 decode tries StdEncoding then URLEncoding — handles both variants from different clients
 - [Phase 02-session-core]: 02-04: WS endpoint on Engine directly (not ProtectedAPI) — API key validated inline before upgrade to support query param auth
 - [Phase 02-session-core]: 02-04: Initial status_update sent after upgrade so subscriber never misses current state; Hub.Broadcast holds write lock across full fan-out
+- [Phase 03-phone-ui-and-actions]: 03-01: Template rendering uses clone-parse-execute — base.html parsed fresh per call, page defines parsed into clone enabling block overrides
+- [Phase 03-phone-ui-and-actions]: 03-01: baseTemplateContent loaded at init() and reused per request for efficiency
+- [Phase 03-phone-ui-and-actions]: 03-01: sessionActionHandler separate from sessionPageHandler — intro Continue button navigates to /s/:id/action without re-triggering opened broadcast
 
 ### Pending Todos
 
@@ -92,5 +96,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 02-04-PLAN.md — WebSocket hub and per-session notifications (Phase 2 complete)
+Stopped at: Completed 03-01-PLAN.md — HTML template system and session page routing
 Resume file: None
