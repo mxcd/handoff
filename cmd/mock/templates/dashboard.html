@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Handoff Mock Consumer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      margin: 0;
+      padding: 24px 16px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0 0 4px;
+      color: #111;
+    }
+
+    header p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: #666;
+    }
+
+    header a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+
+    header a:hover { text-decoration: underline; }
+
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 20px;
+      color: #222;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: #444;
+      margin-bottom: 6px;
+    }
+
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      background: #fff;
+      color: #1a1a1a;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: #0066cc;
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.12);
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 72px;
+    }
+
+    .form-full { flex: 100%; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 18px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .btn-primary {
+      background: #0066cc;
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: #0055aa; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: #e8e8e8;
+      color: #333;
+    }
+
+    .btn-secondary:hover { background: #d8d8d8; }
+
+    .btn-sm {
+      padding: 5px 12px;
+      font-size: 0.8125rem;
+    }
+
+    /* Session panel */
+    #session-panel { display: none; }
+
+    .session-layout {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .qr-section {
+      flex-shrink: 0;
+    }
+
+    #qr-image {
+      display: block;
+      width: 200px;
+      height: 200px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+
+    .session-info {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .info-row {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 12px;
+    }
+
+    .info-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #888;
+      margin-bottom: 3px;
+    }
+
+    .info-value {
+      font-size: 0.875rem;
+      color: #222;
+      word-break: break-all;
+    }
+
+    .info-value a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+
+    .info-value a:hover { text-decoration: underline; }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+
+    .status-pending    { background: #e5e5e5; color: #444; }
+    .status-opened     { background: #dbeafe; color: #1d4ed8; }
+    .status-action_started { background: #fef3c7; color: #b45309; }
+    .status-completed  { background: #dcfce7; color: #166534; }
+    .status-expired    { background: #fee2e2; color: #991b1b; }
+
+    /* Status log */
+    #status-log {
+      margin-top: 16px;
+    }
+
+    #status-log h3 {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #888;
+      margin: 0 0 8px;
+    }
+
+    #log-entries {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    #log-entries li {
+      display: flex;
+      gap: 10px;
+      font-size: 0.8125rem;
+      padding: 4px 0;
+      border-bottom: 1px solid #f0f0f0;
+      color: #444;
+    }
+
+    #log-entries li:last-child { border-bottom: none; }
+
+    .log-time {
+      color: #999;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Result panel */
+    #result-panel { display: none; }
+
+    .result-grid {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .result-item {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      overflow: hidden;
+      flex: 1;
+      min-width: 200px;
+      max-width: 360px;
+    }
+
+    .result-item img {
+      display: block;
+      width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+      background: #f9f9f9;
+    }
+
+    .result-item-meta {
+      padding: 10px 12px;
+      border-top: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .result-meta-text {
+      font-size: 0.8125rem;
+      color: #555;
+      overflow: hidden;
+    }
+
+    .result-meta-text .filename {
+      font-weight: 500;
+      color: #222;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .result-meta-text .content-type {
+      color: #888;
+      font-size: 0.75rem;
+    }
+
+    .no-preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 120px;
+      background: #f5f5f5;
+      color: #999;
+      font-size: 0.875rem;
+    }
+
+    /* Error message */
+    #error-msg {
+      display: none;
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+      border-radius: 5px;
+      padding: 10px 14px;
+      font-size: 0.875rem;
+      margin-top: 12px;
+    }
+
+    /* Loading spinner inline */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Actions row in session panel */
+    .actions-row {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <h1>Handoff Mock Consumer</h1>
+      <p>Connected to Handoff server: <a href="{{.HandoffURL}}" target="_blank" rel="noopener">{{.HandoffURL}}</a></p>
+    </header>
+
+    <!-- Session creation card -->
+    <div class="card" id="creation-card">
+      <h2>Create Session</h2>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="action-type">Action Type</label>
+          <select id="action-type">
+            <option value="photo">Photo</option>
+            <option value="signature">Signature</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="output-format">Output Format</label>
+          <select id="output-format">
+            <option value="jpg">JPEG</option>
+            <option value="png">PNG</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group form-full">
+          <label for="intro-text">Intro Text <span style="color:#999;font-weight:400">(optional)</span></label>
+          <textarea id="intro-text" placeholder="Message shown to the user before they start the action..."></textarea>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="create-btn" onclick="createSession()">
+        Create Session
+      </button>
+
+      <div id="error-msg"></div>
+    </div>
+
+    <!-- Active session card -->
+    <div class="card" id="session-panel">
+      <h2>Active Session</h2>
+
+      <div class="session-layout">
+        <div class="qr-section">
+          <img id="qr-image" src="" alt="QR Code for session URL">
+        </div>
+
+        <div class="session-info">
+          <div class="info-row">
+            <span class="info-label">Session ID</span>
+            <span class="info-value" id="session-id-display">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Phone URL</span>
+            <span class="info-value" id="session-url-display">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Status</span>
+            <span class="status-badge status-pending" id="status-badge">pending</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="status-log">
+        <h3>Status History</h3>
+        <ul id="log-entries"></ul>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" onclick="resetDashboard()">New Session</button>
+      </div>
+    </div>
+
+    <!-- Result preview card -->
+    <div class="card" id="result-panel">
+      <h2>Result</h2>
+      <div class="result-grid" id="result-grid"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Output format options per action type ---
+    const formatOptions = {
+      photo:     [{ value: 'jpg', label: 'JPEG' }, { value: 'png', label: 'PNG' }, { value: 'pdf', label: 'PDF' }],
+      signature: [{ value: 'svg', label: 'SVG' }, { value: 'png', label: 'PNG' }, { value: 'pdf', label: 'PDF' }],
+    };
+
+    document.getElementById('action-type').addEventListener('change', function () {
+      updateFormatOptions(this.value);
+    });
+
+    function updateFormatOptions(actionType) {
+      const select = document.getElementById('output-format');
+      const opts = formatOptions[actionType] || [];
+      select.innerHTML = '';
+      opts.forEach(function (o) {
+        const el = document.createElement('option');
+        el.value = o.value;
+        el.textContent = o.label;
+        select.appendChild(el);
+      });
+    }
+
+    // Init format options on page load.
+    updateFormatOptions('photo');
+
+    // --- Session creation ---
+    let activeEventSource = null;
+
+    function createSession() {
+      const btn = document.getElementById('create-btn');
+      const errDiv = document.getElementById('error-msg');
+      errDiv.style.display = 'none';
+
+      const actionType = document.getElementById('action-type').value;
+      const outputFormat = document.getElementById('output-format').value;
+      const introText = document.getElementById('intro-text').value.trim();
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Creating...';
+
+      fetch('/api/create-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action_type: actionType, output_format: outputFormat, intro_text: introText }),
+      })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok) {
+            throw new Error(data.error || 'Failed to create session');
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        showSession(data);
+        startSSE(data.session_id);
+      })
+      .catch(function (err) {
+        errDiv.textContent = err.message;
+        errDiv.style.display = 'block';
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.textContent = 'Create Session';
+      });
+    }
+
+    function showSession(data) {
+      document.getElementById('creation-card').style.display = 'none';
+      document.getElementById('result-panel').style.display = 'none';
+
+      document.getElementById('qr-image').src = data.qr_data_url;
+      document.getElementById('session-id-display').textContent = data.session_id;
+      document.getElementById('session-url-display').innerHTML =
+        '<a href="' + data.url + '" target="_blank" rel="noopener">' + data.url + '</a>';
+
+      setStatus(data.status);
+      document.getElementById('log-entries').innerHTML = '';
+      addLogEntry(data.status);
+      document.getElementById('session-panel').style.display = 'block';
+    }
+
+    // --- SSE handling ---
+    function startSSE(sessionID) {
+      if (activeEventSource) {
+        activeEventSource.close();
+        activeEventSource = null;
+      }
+
+      const es = new EventSource('/api/session/' + sessionID + '/events');
+      activeEventSource = es;
+
+      es.onmessage = function (e) {
+        let evt;
+        try { evt = JSON.parse(e.data); } catch { return; }
+        handleSSEEvent(evt);
+      };
+
+      es.onerror = function () {
+        addLogEntry('connection lost');
+        es.close();
+      };
+    }
+
+    function handleSSEEvent(evt) {
+      if (!evt || !evt.type) return;
+
+      if (evt.type === 'status_update') {
+        setStatus(evt.status);
+        addLogEntry(evt.status);
+        return;
+      }
+
+      if (evt.type === 'completed') {
+        setStatus('completed');
+        addLogEntry('completed');
+        if (activeEventSource) {
+          activeEventSource.close();
+          activeEventSource = null;
+        }
+        showResult(evt);
+        return;
+      }
+    }
+
+    function setStatus(status) {
+      const badge = document.getElementById('status-badge');
+      badge.className = 'status-badge status-' + status;
+      badge.textContent = status.replace(/_/g, ' ');
+    }
+
+    function addLogEntry(status) {
+      const list = document.getElementById('log-entries');
+      const li = document.createElement('li');
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      li.innerHTML = '<span class="log-time">' + timeStr + '</span><span>' + status.replace(/_/g, ' ') + '</span>';
+      list.appendChild(li);
+      list.scrollTop = list.scrollHeight;
+    }
+
+    // --- Result display ---
+    function showResult(evt) {
+      const grid = document.getElementById('result-grid');
+      grid.innerHTML = '';
+
+      const previews = evt.preview_data || [];
+      const results = evt.result || [];
+
+      // Use preview data if available, else fall back to result metadata.
+      const items = previews.length > 0 ? previews : results.map(function (r) {
+        return { download_id: r.download_id, content_type: r.content_type, filename: r.filename, data_url: '' };
+      });
+
+      items.forEach(function (item) {
+        const div = document.createElement('div');
+        div.className = 'result-item';
+
+        const contentType = item.content_type || '';
+        const isImage = contentType.startsWith('image/');
+
+        if (item.data_url && isImage) {
+          const img = document.createElement('img');
+          img.src = item.data_url;
+          img.alt = item.filename || 'Result';
+          div.appendChild(img);
+        } else if (item.data_url) {
+          const np = document.createElement('div');
+          np.className = 'no-preview';
+          np.textContent = 'Preview not available';
+          div.appendChild(np);
+        } else {
+          const np = document.createElement('div');
+          np.className = 'no-preview';
+          np.textContent = 'Loading preview...';
+          div.appendChild(np);
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'result-item-meta';
+
+        const metaText = document.createElement('div');
+        metaText.className = 'result-meta-text';
+        metaText.innerHTML =
+          '<div class="filename">' + (item.filename || 'result') + '</div>' +
+          '<div class="content-type">' + (item.content_type || '') + '</div>';
+
+        const downloadBtn = document.createElement('a');
+        downloadBtn.href = '/api/session/current/download/' + item.download_id;
+        downloadBtn.className = 'btn btn-secondary btn-sm';
+        downloadBtn.textContent = 'Download';
+        downloadBtn.download = item.filename || 'result';
+
+        meta.appendChild(metaText);
+        meta.appendChild(downloadBtn);
+        div.appendChild(meta);
+        grid.appendChild(div);
+      });
+
+      document.getElementById('result-panel').style.display = 'block';
+    }
+
+    // --- Reset dashboard ---
+    function resetDashboard() {
+      if (activeEventSource) {
+        activeEventSource.close();
+        activeEventSource = null;
+      }
+
+      document.getElementById('creation-card').style.display = 'block';
+      document.getElementById('session-panel').style.display = 'none';
+      document.getElementById('result-panel').style.display = 'none';
+      document.getElementById('error-msg').style.display = 'none';
+      document.getElementById('intro-text').value = '';
+      document.getElementById('create-btn').disabled = false;
+      document.getElementById('create-btn').textContent = 'Create Session';
+
+      // Reset format dropdown to first action type.
+      document.getElementById('action-type').value = 'photo';
+      updateFormatOptions('photo');
+    }
+  </script>
+</body>
+</html>
