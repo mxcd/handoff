@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-last_updated: "2026-02-26T21:15:33Z"
+status: unknown
+last_updated: "2026-02-26T22:42:50.236Z"
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 11
-  completed_plans: 9
+  completed_phases: 3
+  total_plans: 13
+  completed_plans: 12
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A calling backend can create a session, generate a QR code URL, and receive the completed action result (scan, photo, signature) — reliably and without requiring the calling app to build any mobile-facing UI.
-**Current focus:** Phase 3 - Phone UI and Actions
+**Current focus:** Phase 4 - Client Library and Dev Tools
 
 ## Current Position
 
-Phase: 3 of 4 (Phone UI and Actions)
-Plan: 3 of 4 in current phase (plan 03-03 complete)
-Status: Phase 3 in progress
-Last activity: 2026-02-26 — Plan 03-03 complete: Photo capture UI with getUserMedia camera
+Phase: 4 of 4 (Client Library and Dev Tools)
+Plan: 1 of ? in current phase
+Status: In progress — Phase 4 Plan 1 complete
+Last activity: 2026-02-26 — Completed 04-01: Go client library with builder pattern and WebSocket events
 
-Progress: [█████████░] 82%
+Progress: [█████████░] 87%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: 3min
-- Total execution time: 35min
+- Total execution time: 37min
 
 **By Phase:**
 
@@ -42,10 +42,11 @@ Progress: [█████████░] 82%
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 8min | 3min |
 | 02-session-core | 4/4 | 15min | 4min |
-| 03-phone-ui-and-actions | 3/4 | ~5min | 2min |
+| 03-phone-ui-and-actions | 4/4 | ~8min | 2min |
+| 04-client-library-and-dev-tools | 1/? | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 02-03 (5min), 02-04 (2min), 03-01 (2min), 03-02 (2min), 03-04 (2min)
+- Last 5 plans: 02-04 (2min), 03-01 (2min), 03-02 (2min), 03-04 (2min), 04-01 (2min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -91,6 +92,8 @@ Recent decisions affecting current work:
 - [Phase 03-phone-ui-and-actions]: 03-04: signature_pad v5.0.4 UMD bundle downloaded from jsdelivr and committed as static asset — embedded via existing go:embed
 - [Phase 03-phone-ui-and-actions]: 03-04: Undo/redo via signaturePad.toData()/fromData() stroke array manipulation — no library-level undo API needed
 - [Phase 03-phone-ui-and-actions]: 03-04: PDF output_format treated as PNG capture — same as photo approach; caller handles PDF conversion
+- [Phase 04-client-library-and-dev-tools]: pkg/handoff types re-declared independently, not imported from internal/ — keeps pkg/ usable as standalone dependency
+- [Phase 04-client-library-and-dev-tools]: WebSocket reconnects 3 times (1s/2s/4s backoff) then falls back to 2s polling loop
 
 ### Pending Todos
 
@@ -103,5 +106,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 03-03-PLAN.md — Photo capture UI with getUserMedia camera
+Stopped at: Completed 04-01-PLAN.md — Go client library with builder pattern and WebSocket events
 Resume file: None

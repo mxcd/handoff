@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Clean Go server, infrastructure endpoints, API key auth, in-memory cache wired up
 - [x] **Phase 2: Session Core** - Caller can create sessions, receive URLs, and retrieve results via poll or WebSocket
-- [ ] **Phase 3: Phone UI and Actions** - Phone user can open a session URL, see the action UI, and complete photo or signature actions
+- [x] **Phase 3: Phone UI and Actions** - Phone user can open a session URL, see the action UI, and complete photo or signature actions
 - [ ] **Phase 4: Client Library and Dev Tools** - Go client library in pkg/ and mock consumer server for end-to-end testing
 
 ## Phase Details
@@ -69,7 +69,7 @@ Plans:
 - [x] 03-01: Go HTML template system, routing for session UI, expired session page
 - [x] 03-02: Intro page and action-type dispatch logic
 - [x] 03-03: Photo capture UI and HTTP form submission
-- [ ] 03-04: Signature UI (full-screen touch field, undo/redo) and HTTP form submission
+- [x] 03-04: Signature UI (full-screen touch field, undo/redo) and HTTP form submission
 
 ### Phase 4: Client Library and Dev Tools
 **Goal**: Go applications can integrate with Handoff via a typed client library, and the full flow can be tested locally end-to-end
@@ -81,8 +81,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 04-01: Go client library in pkg/ covering session creation and result retrieval
-- [ ] 04-02: Mock consumer server for local e2e testing
+- [x] 04-01: Go client library in pkg/ — types, errors, client with builder pattern, session with WebSocket subscription
+- [ ] 04-02: Mock consumer server — browser dashboard with session creation, QR display, live status, result preview
 
 ## Progress
 
@@ -93,5 +93,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-02-26 |
 | 2. Session Core | 4/4 | Complete | 2026-02-26 |
-| 3. Phone UI and Actions | 3/4 | In progress | - |
-| 4. Client Library and Dev Tools | 0/2 | Not started | - |
+| 3. Phone UI and Actions | 4/4 | Complete | 2026-02-26 |
+| 4. Client Library and Dev Tools | 1/2 | In progress | - |
