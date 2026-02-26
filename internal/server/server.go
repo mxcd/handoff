@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mxcd/handoff/internal/store"
 	"github.com/mxcd/handoff/internal/web"
+	"github.com/mxcd/handoff/internal/ws"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,6 +26,7 @@ type Server struct {
 	HttpServer   *http.Server
 	ProtectedAPI *gin.RouterGroup
 	Store        *store.Store
+	Hub          *ws.Hub
 }
 
 func NewServer(options *ServerOptions) (*Server, error) {
@@ -38,6 +40,7 @@ func NewServer(options *ServerOptions) (*Server, error) {
 	server := &Server{
 		Options: options,
 		Store:   options.Store,
+		Hub:     ws.NewHub(),
 	}
 
 	if !server.Options.DevMode {
@@ -76,6 +79,9 @@ func (s *Server) RegisterRoutes() error {
 	// Result polling and download routes (protected — caller uses API key)
 	s.ProtectedAPI.GET("/sessions/:id/result", s.getResultHandler())
 	s.ProtectedAPI.GET("/downloads/:download_id", s.downloadHandler())
+
+	// WebSocket endpoint for real-time session updates (auth handled in handler)
+	s.Engine.GET(apiBasePath+"/sessions/:id/ws", s.wsHandler())
 
 	// Session action routes (public — phone UI submits results via session UUID)
 	s.Engine.POST("/s/:id/result", s.submitResultHandler())

@@ -136,6 +136,9 @@ func (s *Server) submitResultHandler() gin.HandlerFunc {
 			return
 		}
 
+		// Notify all WebSocket subscribers that the session is complete.
+		s.Hub.BroadcastCompletion(id, string(model.SessionStatusCompleted), resultItems)
+
 		log.Info().Str("session_id", id).Int("items", len(resultItems)).Msg("submit: session completed")
 		c.JSON(http.StatusOK, gin.H{"items": resultItems})
 	}
