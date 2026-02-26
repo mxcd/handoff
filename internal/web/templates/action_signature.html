@@ -1,3 +1,248 @@
+{{define "styles"}}
+<style>
+.sig-container {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #fff; display: flex; flex-direction: column;
+}
+.sig-canvas-wrap {
+  flex: 1; position: relative; overflow: hidden;
+}
+.sig-canvas-wrap canvas {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  touch-action: none;
+}
+.sig-toolbar {
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 12px 16px; background: #f8f8f8; border-top: 1px solid #e0e0e0;
+  gap: 8px;
+}
+.sig-toolbar button {
+  padding: 10px 16px; border-radius: 8px; border: 1px solid #ddd;
+  background: #fff; font-size: 0.9rem; font-weight: 500;
+  cursor: pointer; color: #333; flex: 1; max-width: 100px;
+}
+.sig-toolbar button:disabled {
+  opacity: 0.4; cursor: default;
+}
+.sig-toolbar .btn-submit-sig {
+  background: #111; color: #fff; border-color: #111;
+}
+.sig-toolbar .btn-submit-sig:disabled {
+  background: #999; border-color: #999;
+}
+.rotate-hint {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; z-index: 200;
+  color: #fff; text-align: center; padding: 24px;
+}
+.rotate-hint.hidden { display: none; }
+.rotate-icon {
+  font-size: 4rem; margin-bottom: 16px;
+  animation: rotate-nudge 2s ease-in-out infinite;
+}
+@keyframes rotate-nudge {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-20deg); }
+  75% { transform: rotate(20deg); }
+}
+.spinner-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); display: none;
+  align-items: center; justify-content: center; z-index: 300;
+}
+.spinner-overlay.active { display: flex; }
+.spinner {
+  width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{{end}}
+
 {{define "content"}}
-<p>Signature pad loading...</p>
+<!-- Landscape rotation hint -->
+<div class="rotate-hint" id="rotateHint">
+  <div class="rotate-icon">📱</div>
+  <h1 style="color:#fff; margin-bottom:8px;">Rotate Your Phone</h1>
+  <p style="color:rgba(255,255,255,0.8);">For the best experience, use landscape mode</p>
+  <button onclick="dismissHint()" style="margin-top:24px; padding:12px 32px; border-radius:8px; border:none; background:#fff; color:#111; font-size:1rem; cursor:pointer;">Continue Anyway</button>
+</div>
+
+<!-- Signature canvas -->
+<div class="sig-container" id="sigContainer">
+  <div class="sig-canvas-wrap">
+    <canvas id="sigCanvas"></canvas>
+  </div>
+  <div class="sig-toolbar">
+    <button id="undoBtn" onclick="undoStroke()" disabled>Undo</button>
+    <button id="redoBtn" onclick="redoStroke()" disabled>Redo</button>
+    <button id="clearBtn" onclick="clearPad()" disabled>Clear</button>
+    <button id="submitSigBtn" class="btn-submit-sig" onclick="submitSignature()" disabled>Submit</button>
+  </div>
+</div>
+
+<!-- Loading spinner -->
+<div class="spinner-overlay" id="spinnerView">
+  <div class="spinner"></div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script src="/static/public/signature_pad.umd.min.js"></script>
+<script>
+const canvas = document.getElementById('sigCanvas');
+const sessionID = '{{.SessionID}}';
+const submitURL = '{{.SubmitURL}}';
+const outputFormat = '{{.OutputFormat}}';
+
+// Initialize SignaturePad
+const signaturePad = new SignaturePad(canvas, {
+  backgroundColor: 'rgb(255, 255, 255)',
+  penColor: 'rgb(0, 0, 0)',
+  minWidth: 1,
+  maxWidth: 3
+});
+
+// Undo/redo stack
+let undoneStrokes = [];
+
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  const ratio = Math.max(window.devicePixelRatio || 1, 1);
+  const data = signaturePad.toData();
+  canvas.width = wrap.offsetWidth * ratio;
+  canvas.height = wrap.offsetHeight * ratio;
+  canvas.getContext('2d').scale(ratio, ratio);
+  signaturePad.clear();
+  signaturePad.fromData(data);
+  updateButtons();
+}
+
+function updateButtons() {
+  const hasData = !signaturePad.isEmpty();
+  const strokes = signaturePad.toData();
+  document.getElementById('undoBtn').disabled = strokes.length === 0;
+  document.getElementById('redoBtn').disabled = undoneStrokes.length === 0;
+  document.getElementById('clearBtn').disabled = !hasData;
+  document.getElementById('submitSigBtn').disabled = !hasData;
+}
+
+function undoStroke() {
+  const data = signaturePad.toData();
+  if (data.length > 0) {
+    undoneStrokes.push(data.pop());
+    signaturePad.clear();
+    signaturePad.fromData(data);
+    updateButtons();
+  }
+}
+
+function redoStroke() {
+  if (undoneStrokes.length > 0) {
+    const data = signaturePad.toData();
+    data.push(undoneStrokes.pop());
+    signaturePad.clear();
+    signaturePad.fromData(data);
+    updateButtons();
+  }
+}
+
+function clearPad() {
+  undoneStrokes = [];
+  signaturePad.clear();
+  updateButtons();
+}
+
+// Listen for stroke events to update buttons and clear redo stack
+signaturePad.addEventListener('endStroke', () => {
+  undoneStrokes = []; // New stroke clears redo stack
+  updateButtons();
+});
+
+async function submitSignature() {
+  if (signaturePad.isEmpty()) return;
+
+  document.getElementById('spinnerView').classList.add('active');
+  document.getElementById('submitSigBtn').disabled = true;
+
+  try {
+    let dataURL, mimeType, ext;
+
+    if (outputFormat === 'svg') {
+      // SVG output
+      const svgString = signaturePad.toSVG();
+      dataURL = 'data:image/svg+xml;base64,' + btoa(svgString);
+      mimeType = 'image/svg+xml';
+      ext = 'svg';
+    } else {
+      // PNG output (default for png and pdf)
+      dataURL = signaturePad.toDataURL('image/png');
+      mimeType = 'image/png';
+      ext = 'png';
+    }
+
+    const base64Data = dataURL.split(',')[1];
+
+    const payload = {
+      items: [{
+        content_type: mimeType,
+        filename: 'signature.' + ext,
+        data: base64Data
+      }]
+    };
+
+    const response = await fetch(submitURL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      window.location.href = '/s/' + sessionID;
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Upload failed');
+    }
+  } catch (err) {
+    document.getElementById('spinnerView').classList.remove('active');
+    document.getElementById('submitSigBtn').disabled = false;
+    alert('Failed to submit signature: ' + err.message);
+  }
+}
+
+// Rotation hint logic
+let hintDismissed = false;
+function checkOrientation() {
+  if (hintDismissed) return;
+  const hint = document.getElementById('rotateHint');
+  if (window.innerHeight > window.innerWidth) {
+    hint.classList.remove('hidden');
+  } else {
+    hint.classList.add('hidden');
+  }
+}
+
+function dismissHint() {
+  hintDismissed = true;
+  document.getElementById('rotateHint').classList.add('hidden');
+}
+
+// Initialize
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  checkOrientation();
+});
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    resizeCanvas();
+    checkOrientation();
+  }, 100);
+});
+
+// Initial setup
+resizeCanvas();
+checkOrientation();
+</script>
 {{end}}
