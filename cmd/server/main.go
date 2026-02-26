@@ -9,6 +9,7 @@ import (
 
 	"github.com/mxcd/go-config/config"
 	"github.com/mxcd/handoff/internal/server"
+	"github.com/mxcd/handoff/internal/store"
 	"github.com/mxcd/handoff/internal/util"
 	"github.com/rs/zerolog/log"
 )
@@ -23,9 +24,12 @@ func main() {
 		log.Panic().Err(err).Msg("error initializing logger")
 	}
 
+	sessionStore := store.NewStore()
+
 	s, err := server.NewServer(&server.ServerOptions{
 		DevMode: config.Get().Bool("DEV"),
 		Port:    config.Get().Int("PORT"),
+		Store:   sessionStore,
 	})
 	if err != nil {
 		log.Panic().Err(err).Msg("error initializing server")

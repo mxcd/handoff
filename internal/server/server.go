@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mxcd/handoff/internal/store"
 	"github.com/mxcd/handoff/internal/web"
 	"github.com/rs/zerolog/log"
 )
@@ -15,6 +16,7 @@ const apiBasePath = "/api/v1"
 type ServerOptions struct {
 	DevMode bool
 	Port    int
+	Store   *store.Store
 }
 
 type Server struct {
@@ -22,15 +24,20 @@ type Server struct {
 	Engine       *gin.Engine
 	HttpServer   *http.Server
 	ProtectedAPI *gin.RouterGroup
+	Store        *store.Store
 }
 
 func NewServer(options *ServerOptions) (*Server, error) {
 	if options == nil {
 		return nil, fmt.Errorf("server options cannot be nil")
 	}
+	if options.Store == nil {
+		return nil, fmt.Errorf("server options Store cannot be nil")
+	}
 
 	server := &Server{
 		Options: options,
+		Store:   options.Store,
 	}
 
 	if !server.Options.DevMode {

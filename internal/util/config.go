@@ -19,7 +19,7 @@ func InitConfig() error {
 
 		// session and result TTLs
 		config.String("SESSION_TTL").Default("30m"),
-		config.String("RESULT_TTL").Default("1m"),
+		config.String("RESULT_TTL").Default("5m"),
 
 		// base URL for generating session URLs (required)
 		config.String("BASE_URL").NotEmpty(),
