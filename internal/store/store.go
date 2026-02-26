@@ -163,23 +163,29 @@ func (s *Store) MarkSessionCompleted(id string, result []model.ResultItem) error
 	return s.UpdateSession(sess)
 }
 
-// StoreFile stores binary file data under the given downloadID with a specific TTL.
-func (s *Store) StoreFile(downloadID string, data []byte, ttl time.Duration) error {
-	log.Debug().Str("download_id", downloadID).Dur("ttl", ttl).Int("bytes", len(data)).Msg("store: storing file")
-	s.files.Set(fileKey(downloadID), data, ttl)
+// StoredFile holds binary file data together with its MIME content type.
+type StoredFile struct {
+	Data        []byte
+	ContentType string
+}
+
+// StoreFile stores binary file data and its content type under the given downloadID with a specific TTL.
+func (s *Store) StoreFile(downloadID string, data []byte, contentType string, ttl time.Duration) error {
+	log.Debug().Str("download_id", downloadID).Dur("ttl", ttl).Int("bytes", len(data)).Str("content_type", contentType).Msg("store: storing file")
+	s.files.Set(fileKey(downloadID), &StoredFile{Data: data, ContentType: contentType}, ttl)
 	return nil
 }
 
 // GetFile retrieves file data by downloadID. Returns nil if the file has
 // expired or was never stored.
-func (s *Store) GetFile(downloadID string) ([]byte, error) {
+func (s *Store) GetFile(downloadID string) (*StoredFile, error) {
 	v, found := s.files.Get(fileKey(downloadID))
 	if !found {
 		log.Debug().Str("download_id", downloadID).Msg("store: file not found or expired")
 		return nil, nil
 	}
 
-	data := v.([]byte)
-	log.Debug().Str("download_id", downloadID).Int("bytes", len(data)).Msg("store: file retrieved")
-	return data, nil
+	sf := v.(*StoredFile)
+	log.Debug().Str("download_id", downloadID).Int("bytes", len(sf.Data)).Msg("store: file retrieved")
+	return sf, nil
 }
