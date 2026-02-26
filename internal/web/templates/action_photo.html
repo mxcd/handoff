@@ -1,3 +1,215 @@
+{{define "styles"}}
+<style>
+.camera-container {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #000; display: flex; flex-direction: column;
+}
+video {
+  flex: 1; width: 100%; object-fit: cover;
+}
+.camera-controls {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 24px; display: flex; justify-content: center;
+  background: linear-gradient(transparent, rgba(0,0,0,0.6));
+}
+.capture-btn {
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 4px solid #fff; background: rgba(255,255,255,0.3);
+  cursor: pointer; transition: background 0.2s;
+}
+.capture-btn:active { background: rgba(255,255,255,0.6); }
+.preview-container {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #000; display: none; flex-direction: column;
+}
+.preview-container.active { display: flex; }
+.preview-container img {
+  flex: 1; width: 100%; object-fit: contain;
+}
+.preview-controls {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 24px; display: flex; justify-content: space-around;
+  background: linear-gradient(transparent, rgba(0,0,0,0.6));
+}
+.preview-btn {
+  padding: 14px 32px; border-radius: 8px; border: none;
+  font-size: 1rem; font-weight: 500; cursor: pointer;
+}
+.btn-retake { background: rgba(255,255,255,0.2); color: #fff; }
+.btn-submit { background: #fff; color: #111; }
+.error-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: #fff; display: none; flex-direction: column;
+  align-items: center; justify-content: center; padding: 24px;
+  text-align: center;
+}
+.error-overlay.active { display: flex; }
+.spinner-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); display: none;
+  align-items: center; justify-content: center; z-index: 100;
+}
+.spinner-overlay.active { display: flex; }
+.spinner {
+  width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{{end}}
+
 {{define "content"}}
-<p>Photo capture loading...</p>
+<!-- Camera viewfinder -->
+<div class="camera-container" id="cameraView">
+  <video id="video" autoplay playsinline></video>
+  <div class="camera-controls">
+    <button class="capture-btn" id="captureBtn" onclick="capturePhoto()"></button>
+  </div>
+</div>
+
+<!-- Photo preview -->
+<div class="preview-container" id="previewView">
+  <img id="previewImg" alt="Captured photo">
+  <div class="preview-controls">
+    <button class="preview-btn btn-retake" onclick="retakePhoto()">Retake</button>
+    <button class="preview-btn btn-submit" id="submitBtn" onclick="submitPhoto()">Submit</button>
+  </div>
+</div>
+
+<!-- Error state -->
+<div class="error-overlay" id="errorView">
+  <div style="font-size: 3rem; margin-bottom: 24px;">&#128247;</div>
+  <h1>Camera Access Required</h1>
+  <p id="errorMsg">Please allow camera access to take a photo.</p>
+</div>
+
+<!-- Loading spinner -->
+<div class="spinner-overlay" id="spinnerView">
+  <div class="spinner"></div>
+</div>
+
+<!-- Hidden canvas for photo capture -->
+<canvas id="canvas" style="display:none;"></canvas>
+{{end}}
+
+{{define "scripts"}}
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const previewImg = document.getElementById('previewImg');
+const cameraView = document.getElementById('cameraView');
+const previewView = document.getElementById('previewView');
+const errorView = document.getElementById('errorView');
+const spinnerView = document.getElementById('spinnerView');
+const errorMsg = document.getElementById('errorMsg');
+
+const sessionID = '{{.SessionID}}';
+const submitURL = '{{.SubmitURL}}';
+const outputFormat = '{{.OutputFormat}}';
+
+let capturedDataURL = null;
+let stream = null;
+
+async function initCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    video.srcObject = stream;
+  } catch (err) {
+    console.error('Camera error:', err);
+    cameraView.style.display = 'none';
+    errorView.classList.add('active');
+    if (err.name === 'NotAllowedError') {
+      errorMsg.textContent = 'Camera permission was denied. Please allow camera access in your browser settings and reload.';
+    } else if (err.name === 'NotFoundError') {
+      errorMsg.textContent = 'No camera found on this device.';
+    } else {
+      errorMsg.textContent = 'Could not access the camera: ' + err.message;
+    }
+  }
+}
+
+function capturePhoto() {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+
+  // Determine MIME type and quality based on output format
+  // For "pdf" output, capture as JPEG (caller handles PDF conversion)
+  let mimeType = 'image/jpeg';
+  let quality = 0.92;
+  if (outputFormat === 'png') {
+    mimeType = 'image/png';
+    quality = undefined;
+  }
+
+  capturedDataURL = canvas.toDataURL(mimeType, quality);
+  previewImg.src = capturedDataURL;
+
+  // Show preview, hide camera
+  cameraView.style.display = 'none';
+  previewView.classList.add('active');
+
+  // Stop camera while previewing to save battery
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+}
+
+function retakePhoto() {
+  capturedDataURL = null;
+  previewView.classList.remove('active');
+  cameraView.style.display = 'flex';
+  initCamera();
+}
+
+async function submitPhoto() {
+  if (!capturedDataURL) return;
+
+  spinnerView.classList.add('active');
+  document.getElementById('submitBtn').disabled = true;
+
+  try {
+    // Extract base64 data (remove data URL prefix)
+    const base64Data = capturedDataURL.split(',')[1];
+    // For "pdf" output format, capture as JPEG (caller handles PDF conversion)
+    const mimeType = outputFormat === 'png' ? 'image/png' : 'image/jpeg';
+    const ext = outputFormat === 'png' ? 'png' : 'jpg';
+
+    const payload = {
+      items: [{
+        content_type: mimeType,
+        filename: 'photo.' + ext,
+        data: base64Data
+      }]
+    };
+
+    const response = await fetch(submitURL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      // Redirect to success page
+      window.location.href = '/s/' + sessionID;
+    } else {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Upload failed');
+    }
+  } catch (err) {
+    spinnerView.classList.remove('active');
+    document.getElementById('submitBtn').disabled = false;
+    alert('Failed to submit photo: ' + err.message);
+  }
+}
+
+// Initialize camera on page load
+initCamera();
+</script>
 {{end}}
