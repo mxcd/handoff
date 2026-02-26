@@ -86,6 +86,9 @@ Recent decisions affecting current work:
 - [Phase 03-phone-ui-and-actions]: 03-01: sessionActionHandler separate from sessionPageHandler — intro Continue button navigates to /s/:id/action without re-triggering opened broadcast
 - [Phase 03]: renderActionPage checks opened||pending before action_started to handle both intro and no-intro paths
 - [Phase 03]: All web.RenderPage errors log only — no alternate response since headers may be partially written
+- [Phase 03-phone-ui-and-actions]: 03-04: signature_pad v5.0.4 UMD bundle downloaded from jsdelivr and committed as static asset — embedded via existing go:embed
+- [Phase 03-phone-ui-and-actions]: 03-04: Undo/redo via signaturePad.toData()/fromData() stroke array manipulation — no library-level undo API needed
+- [Phase 03-phone-ui-and-actions]: 03-04: PDF output_format treated as PNG capture — same as photo approach; caller handles PDF conversion
 
 ### Pending Todos
 
