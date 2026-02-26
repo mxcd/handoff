@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation** - Clean Go server, infrastructure endpoints, API key auth, in-memory cache wired up
 - [x] **Phase 2: Session Core** - Caller can create sessions, receive URLs, and retrieve results via poll or WebSocket
 - [x] **Phase 3: Phone UI and Actions** - Phone user can open a session URL, see the action UI, and complete photo or signature actions
-- [ ] **Phase 4: Client Library and Dev Tools** - Go client library in pkg/ and mock consumer server for end-to-end testing
+- [x] **Phase 4: Client Library and Dev Tools** - Go client library in pkg/ and mock consumer server for end-to-end testing
 
 ## Phase Details
 
@@ -82,7 +82,7 @@ Plans:
 
 Plans:
 - [x] 04-01: Go client library in pkg/ — types, errors, client with builder pattern, session with WebSocket subscription
-- [ ] 04-02: Mock consumer server — browser dashboard with session creation, QR display, live status, result preview
+- [x] 04-02: Mock consumer server — browser dashboard with session creation, QR display, live status, result preview
 
 ## Progress
 
@@ -94,4 +94,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation | 3/3 | Complete | 2026-02-26 |
 | 2. Session Core | 4/4 | Complete | 2026-02-26 |
 | 3. Phone UI and Actions | 4/4 | Complete | 2026-02-26 |
-| 4. Client Library and Dev Tools | 1/2 | In progress | - |
+| 4. Client Library and Dev Tools | 2/2 | Complete | 2026-02-26 |
