@@ -67,8 +67,8 @@ Plans:
 
 Plans:
 - [x] 03-01: Go HTML template system, routing for session UI, expired session page
-- [ ] 03-02: Intro page and action-type dispatch logic
-- [ ] 03-03: Photo capture UI and HTTP form submission
+- [x] 03-02: Intro page and action-type dispatch logic
+- [x] 03-03: Photo capture UI and HTTP form submission
 - [ ] 03-04: Signature UI (full-screen touch field, undo/redo) and HTTP form submission
 
 ### Phase 4: Client Library and Dev Tools
@@ -93,5 +93,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-02-26 |
 | 2. Session Core | 4/4 | Complete | 2026-02-26 |
-| 3. Phone UI and Actions | 1/4 | In progress | - |
+| 3. Phone UI and Actions | 3/4 | In progress | - |
 | 4. Client Library and Dev Tools | 0/2 | Not started | - |

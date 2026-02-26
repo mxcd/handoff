@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 3 of 4 (Phone UI and Actions)
-Plan: 4 of 4 in current phase (plan 03-04 complete)
+Plan: 3 of 4 in current phase (plan 03-03 complete)
 Status: Phase 3 in progress
-Last activity: 2026-02-26 — Plan 03-04 complete: Signature pad UI with undo/redo and submission
+Last activity: 2026-02-26 — Plan 03-03 complete: Photo capture UI with getUserMedia camera
 
 Progress: [█████████░] 82%
 
@@ -42,7 +42,7 @@ Progress: [█████████░] 82%
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 8min | 3min |
 | 02-session-core | 4/4 | 15min | 4min |
-| 03-phone-ui-and-actions | 4/4 | 12min | 3min |
+| 03-phone-ui-and-actions | 3/4 | ~5min | 2min |
 
 **Recent Trend:**
 - Last 5 plans: 02-03 (5min), 02-04 (2min), 03-01 (2min), 03-02 (2min), 03-04 (2min)
@@ -86,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 03-phone-ui-and-actions]: 03-01: sessionActionHandler separate from sessionPageHandler — intro Continue button navigates to /s/:id/action without re-triggering opened broadcast
 - [Phase 03]: renderActionPage checks opened||pending before action_started to handle both intro and no-intro paths
 - [Phase 03]: All web.RenderPage errors log only — no alternate response since headers may be partially written
+- [Phase 03-phone-ui-and-actions]: 03-03: PDF output format treated as JPEG in photo capture — caller handles any PDF conversion post-submission
+- [Phase 03-phone-ui-and-actions]: 03-03: Camera stream stopped after capture during preview to save battery; re-initialized on Retake
 - [Phase 03-phone-ui-and-actions]: 03-04: signature_pad v5.0.4 UMD bundle downloaded from jsdelivr and committed as static asset — embedded via existing go:embed
 - [Phase 03-phone-ui-and-actions]: 03-04: Undo/redo via signaturePad.toData()/fromData() stroke array manipulation — no library-level undo API needed
 - [Phase 03-phone-ui-and-actions]: 03-04: PDF output_format treated as PNG capture — same as photo approach; caller handles PDF conversion
@@ -101,5 +103,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 03-04-PLAN.md — Signature pad UI with undo/redo and submission
+Stopped at: Completed 03-03-PLAN.md — Photo capture UI with getUserMedia camera
 Resume file: None
