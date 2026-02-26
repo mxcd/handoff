@@ -83,6 +83,10 @@ func (s *Server) RegisterRoutes() error {
 	// WebSocket endpoint for real-time session updates (auth handled in handler)
 	s.Engine.GET(apiBasePath+"/sessions/:id/ws", s.wsHandler())
 
+	// Phone-facing session pages (public — session UUID is the auth)
+	s.Engine.GET("/s/:id", s.sessionPageHandler())
+	s.Engine.GET("/s/:id/action", s.sessionActionHandler())
+
 	// Session action routes (public — phone UI submits results via session UUID)
 	s.Engine.POST("/s/:id/result", s.submitResultHandler())
 
