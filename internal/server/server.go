@@ -73,6 +73,13 @@ func (s *Server) RegisterRoutes() error {
 	s.ProtectedAPI.POST("/sessions", s.createSessionHandler())
 	s.ProtectedAPI.GET("/sessions/:id", s.getSessionHandler())
 
+	// Result polling and download routes (protected — caller uses API key)
+	s.ProtectedAPI.GET("/sessions/:id/result", s.getResultHandler())
+	s.ProtectedAPI.GET("/downloads/:download_id", s.downloadHandler())
+
+	// Session action routes (public — phone UI submits results via session UUID)
+	s.Engine.POST("/s/:id/result", s.submitResultHandler())
+
 	// Static files are public (no middleware)
 	web.RegisterStaticFiles(s.Engine)
 	return nil
