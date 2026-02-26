@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-26T19:18:59.592Z"
+last_updated: "2026-02-26T20:24:08Z"
 progress:
-  total_phases: 1
+  total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 10
+  completed_plans: 4
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** A calling backend can create a session, generate a QR code URL, and receive the completed action result (scan, photo, signature) — reliably and without requiring the calling app to build any mobile-facing UI.
-**Current focus:** Phase 1 - Foundation
+**Current focus:** Phase 2 - Session Core
 
 ## Current Position
 
-Phase: 1 of 4 (Foundation)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-02-26 — Plan 01-03 complete: API key auth middleware, protected route group wired in server.go
+Phase: 2 of 4 (Session Core)
+Plan: 1 of 3 in current phase (plan 02-01 complete)
+Status: In progress
+Last activity: 2026-02-26 — Plan 02-01 complete: session/result model types, in-memory store with go-cache TTL, Store wired into Server
 
-Progress: [███░░░░░░░] 25%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -41,9 +41,10 @@ Progress: [███░░░░░░░] 25%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 8min | 3min |
+| 02-session-core | 1/3 | 7min | 7min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2min), 01-02 (5min), 01-03 (1min)
+- Last 5 plans: 01-01 (2min), 01-02 (5min), 01-03 (1min), 02-01 (7min)
 - Trend: —
 
 *Updated after each plan completion*
@@ -67,6 +68,10 @@ Recent decisions affecting current work:
 - 01-03: Health and version registered on s.Engine directly (public); protected group uses apiKeyAuth() middleware
 - 01-03: ProtectedAPI *gin.RouterGroup field on Server struct — Phase 2 attaches session/result routes here
 - 01-03: Linear scan of API_KEYS per request — acceptable for small key lists (1-5 keys), no caching needed
+- 02-01: Store uses two separate go-cache instances (sessions + files) to keep file TTL independent from session TTL
+- 02-01: Tombstone stored at creation time with 24h TTL alongside live session — no timer/callback needed
+- 02-01: UpdateSession recalculates remaining TTL from CreatedAt rather than storing original expiry
+- 02-01: RESULT_TTL config default corrected from 1m to 5m per CONTEXT.md
 
 ### Pending Todos
 
@@ -79,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 01-03-PLAN.md — API key auth middleware, protected route group; Phase 1 Foundation complete
+Stopped at: Completed 02-01-PLAN.md — session/result model types, in-memory store with go-cache TTL, Store wired into Server
 Resume file: None

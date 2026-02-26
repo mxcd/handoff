@@ -48,10 +48,10 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 02-01: Session model, in-memory store via go-cache, TTL expiry
-- [ ] 02-02: Session creation API (POST) and URL generation
-- [ ] 02-03: Result retrieval endpoint (polling) and configurable result format
-- [ ] 02-04: WebSocket notification for session completion
+- [x] 02-01: Session/result model, in-memory store via go-cache, TTL expiry and tombstones
+- [ ] 02-02: Session creation (POST) and retrieval (GET) API with URL generation
+- [ ] 02-03: Result polling, result submission, and file download endpoints
+- [ ] 02-04: Per-session WebSocket notifications for real-time result delivery
 
 ### Phase 3: Phone UI and Actions
 **Goal**: A phone user can scan the QR code URL, see the correct action UI, and submit a completed photo or signature back to Handoff
@@ -92,6 +92,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-02-26 |
-| 2. Session Core | 0/4 | Not started | - |
+| 2. Session Core | 1/4 | In progress | - |
 | 3. Phone UI and Actions | 0/4 | Not started | - |
 | 4. Client Library and Dev Tools | 0/2 | Not started | - |
