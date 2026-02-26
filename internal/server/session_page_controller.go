@@ -22,9 +22,11 @@ func (s *Server) sessionPageHandler() gin.HandlerFunc {
 			log.Error().Err(err).Str("session_id", id).Msg("session_page: store error")
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusInternalServerError)
-			web.RenderPage(c.Writer, "error.html", map[string]interface{}{
+			if err := web.RenderPage(c.Writer, "error.html", map[string]interface{}{
 				"Message": "Something went wrong. Please try again.",
-			})
+			}); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_page: error template render error")
+			}
 			return
 		}
 
@@ -32,9 +34,11 @@ func (s *Server) sessionPageHandler() gin.HandlerFunc {
 		if session == nil {
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusNotFound)
-			web.RenderPage(c.Writer, "error.html", map[string]interface{}{
+			if err := web.RenderPage(c.Writer, "error.html", map[string]interface{}{
 				"Message": "This session was not found.",
-			})
+			}); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_page: error template render error")
+			}
 			return
 		}
 
@@ -42,7 +46,9 @@ func (s *Server) sessionPageHandler() gin.HandlerFunc {
 		if session.Status == model.SessionStatusExpired {
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusGone)
-			web.RenderPage(c.Writer, "expired.html", nil)
+			if err := web.RenderPage(c.Writer, "expired.html", nil); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_page: expired template render error")
+			}
 			return
 		}
 
@@ -50,7 +56,9 @@ func (s *Server) sessionPageHandler() gin.HandlerFunc {
 		if session.Status == model.SessionStatusCompleted {
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusOK)
-			web.RenderPage(c.Writer, "success.html", nil)
+			if err := web.RenderPage(c.Writer, "success.html", nil); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_page: success template render error")
+			}
 			return
 		}
 
@@ -70,10 +78,12 @@ func (s *Server) sessionPageHandler() gin.HandlerFunc {
 			actionURL := fmt.Sprintf("/s/%s/action", id)
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusOK)
-			web.RenderPage(c.Writer, "intro.html", map[string]interface{}{
+			if err := web.RenderPage(c.Writer, "intro.html", map[string]interface{}{
 				"IntroText": session.IntroText,
 				"ActionURL": actionURL,
-			})
+			}); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_page: intro template render error")
+			}
 			return
 		}
 
@@ -83,7 +93,17 @@ func (s *Server) sessionPageHandler() gin.HandlerFunc {
 }
 
 // renderActionPage renders the correct action-specific template based on session.ActionType.
+// It also advances the session status to action_started if it is currently opened.
 func (s *Server) renderActionPage(c *gin.Context, session *model.Session) {
+	// Advance to action_started once the user reaches the action UI
+	if session.Status == model.SessionStatusOpened || session.Status == model.SessionStatusPending {
+		session.Status = model.SessionStatusActionStarted
+		if err := s.Store.UpdateSession(session); err != nil {
+			log.Error().Err(err).Str("session_id", session.ID).Msg("session_page: failed to update action_started")
+		}
+		s.Hub.BroadcastStatusUpdate(session.ID, string(model.SessionStatusActionStarted))
+	}
+
 	data := map[string]interface{}{
 		"SessionID":    session.ID,
 		"ActionType":   string(session.ActionType),
@@ -100,9 +120,11 @@ func (s *Server) renderActionPage(c *gin.Context, session *model.Session) {
 	default:
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.Status(http.StatusInternalServerError)
-		web.RenderPage(c.Writer, "error.html", map[string]interface{}{
+		if err := web.RenderPage(c.Writer, "error.html", map[string]interface{}{
 			"Message": "Unknown action type.",
-		})
+		}); err != nil {
+			log.Error().Err(err).Str("session_id", session.ID).Msg("session_page: error template render error")
+		}
 		return
 	}
 
@@ -124,32 +146,40 @@ func (s *Server) sessionActionHandler() gin.HandlerFunc {
 			log.Error().Err(err).Str("session_id", id).Msg("session_action: store error")
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusInternalServerError)
-			web.RenderPage(c.Writer, "error.html", map[string]interface{}{
+			if err := web.RenderPage(c.Writer, "error.html", map[string]interface{}{
 				"Message": "Something went wrong. Please try again.",
-			})
+			}); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_action: error template render error")
+			}
 			return
 		}
 
 		if session == nil {
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusNotFound)
-			web.RenderPage(c.Writer, "error.html", map[string]interface{}{
+			if err := web.RenderPage(c.Writer, "error.html", map[string]interface{}{
 				"Message": "This session was not found.",
-			})
+			}); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_action: error template render error")
+			}
 			return
 		}
 
 		if session.Status == model.SessionStatusExpired {
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusGone)
-			web.RenderPage(c.Writer, "expired.html", nil)
+			if err := web.RenderPage(c.Writer, "expired.html", nil); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_action: expired template render error")
+			}
 			return
 		}
 
 		if session.Status == model.SessionStatusCompleted {
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.Status(http.StatusOK)
-			web.RenderPage(c.Writer, "success.html", nil)
+			if err := web.RenderPage(c.Writer, "success.html", nil); err != nil {
+				log.Error().Err(err).Str("session_id", id).Msg("session_action: success template render error")
+			}
 			return
 		}
 
