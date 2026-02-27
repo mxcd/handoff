@@ -112,7 +112,7 @@ Plans:
 
 Plans:
 - [x] 06-01: Server template data, camera capture with EXIF normalization, crop canvas with L-bracket handles, dim overlay, and magnifying glass
-- [ ] 06-02: Homography.js perspective warp, preview screen (Accept/Re-crop/Retake), single-page upload+finalize flow
+- [x] 06-02: Homography.js perspective warp, preview screen (Accept/Re-crop/Retake), single-page upload+finalize flow
 - [ ] 06-03: Filmstrip thumbnail strip with reorder/delete, document boundaries, review screen, batch upload+finalize
 
 ## Progress
@@ -127,4 +127,4 @@ Phases execute in numeric order: 5 → 6
 | 3. Phone UI and Actions | v1.0 | 4/4 | Complete | 2026-02-26 |
 | 4. Client Library and Dev Tools | v1.0 | 2/2 | Complete | 2026-02-26 |
 | 5. Scan Server Infrastructure | v1.1 | 3/TBD | In progress | - |
-| 6. Scan Capture and Crop UI | v1.1 | 0/3 | Not started | - |
+| 6. Scan Capture and Crop UI | v1.1 | 2/3 | In progress | - |

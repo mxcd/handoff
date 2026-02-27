@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Document Scanning
 status: unknown
-last_updated: "2026-02-27T16:35:00Z"
+last_updated: "2026-02-27T17:18:00Z"
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 17
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 6 of 6 (Scan Capture and Crop UI)
-Plan: 1 of TBD in current phase
+Plan: 2 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-27 — Completed 06-01 (scan capture + crop UI with L-bracket handles and magnifier)
+Last activity: 2026-02-27 — Completed 06-02 (Homography.js perspective warp, preview screen, single-page upload+finalize flow)
 
-Progress: [████░░░░░░] 40%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -41,7 +41,7 @@ Progress: [████░░░░░░] 40%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 05-scan-server-infrastructure | 3 | 9 min | 3 min |
-| 06-scan-capture-and-crop-ui | 1 | 3 min | 3 min |
+| 06-scan-capture-and-crop-ui | 2 | 6 min | 3 min |
 
 *Updated after each plan completion*
 
@@ -71,6 +71,9 @@ Recent decisions affecting current work:
 - Canvas coords NOT multiplied by devicePixelRatio — CSS pixel coordinate space for simpler hit testing
 - cropPoints stored in image pixel space for downstream Homography.js warp in plan 06-02
 - accept="image/*" without capture attribute — Android 14/15 Chrome hides camera with capture attr
+- script type=module for ESM Homography.js; window.* exports for onclick compatibility
+- Warp output sized from quad edge lengths (max of opposite sides), capped at 1500px long side
+- acceptPage() handles 410 (expired) and 409 (completed) as special redirects, not errors
 
 ### Pending Todos
 
@@ -83,5 +86,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 06-01-PLAN.md — scan capture + crop UI, EXIF normalization, L-bracket handles, magnifier
+Stopped at: Completed 06-02-PLAN.md — Homography.js warp, preview screen, single-page upload+finalize
 Resume file: None
