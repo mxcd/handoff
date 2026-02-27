@@ -38,11 +38,15 @@ func (s *Server) getResultHandler() gin.HandlerFunc {
 			return
 		}
 		if session.Status == model.SessionStatusCompleted {
-			c.JSON(http.StatusOK, gin.H{
+			resp := gin.H{
 				"status":       "completed",
 				"completed_at": session.CompletedAt,
 				"items":        session.Result,
-			})
+			}
+			if session.ActionType == model.ActionTypeScan && session.ScanResult != nil {
+				resp["scan_result"] = session.ScanResult
+			}
+			c.JSON(http.StatusOK, resp)
 			return
 		}
 
