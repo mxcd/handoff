@@ -108,10 +108,12 @@ Plans:
   3. Phone user sees a perspective-corrected flat preview of the cropped document and can either accept it or return to re-crop
   4. In multi-page mode, phone user can capture additional pages, review all pages, remove any page, and choose single-page or multi-page mode before starting
   5. In multi-document mode, phone user can separate document boundaries with a "Next Document" button, review all documents and pages, and submit the complete multi-document scan
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: TBD
+- [ ] 06-01: Server template data, camera capture with EXIF normalization, crop canvas with L-bracket handles, dim overlay, and magnifying glass
+- [ ] 06-02: Homography.js perspective warp, preview screen (Accept/Re-crop/Retake), single-page upload+finalize flow
+- [ ] 06-03: Filmstrip thumbnail strip with reorder/delete, document boundaries, review screen, batch upload+finalize
 
 ## Progress
 
@@ -125,4 +127,4 @@ Phases execute in numeric order: 5 → 6
 | 3. Phone UI and Actions | v1.0 | 4/4 | Complete | 2026-02-26 |
 | 4. Client Library and Dev Tools | v1.0 | 2/2 | Complete | 2026-02-26 |
 | 5. Scan Server Infrastructure | v1.1 | 3/TBD | In progress | - |
-| 6. Scan Capture and Crop UI | v1.1 | 0/TBD | Not started | - |
+| 6. Scan Capture and Crop UI | v1.1 | 0/3 | Not started | - |

@@ -118,6 +118,9 @@ func (s *Server) renderActionPage(c *gin.Context, session *model.Session) {
 	case model.ActionTypeSignature:
 		templateName = "action_signature.html"
 	case model.ActionTypeScan:
+		data["ScanDocumentMode"] = string(session.ScanDocumentMode)
+		data["ScanUploadURL"] = fmt.Sprintf("/s/%s/scan/upload", session.ID)
+		data["ScanFinalizeURL"] = fmt.Sprintf("/s/%s/scan/finalize", session.ID)
 		templateName = "action_scan.html"
 	default:
 		c.Header("Content-Type", "text/html; charset=utf-8")

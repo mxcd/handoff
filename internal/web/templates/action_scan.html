@@ -1,25 +1,264 @@
 {{define "styles"}}
-.scan-placeholder {
-  text-align: center;
-  padding: 48px 24px;
+/* ===== Layout: full-screen fixed state machine ===== */
+.scan-screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: none;
 }
-.scan-placeholder h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 16px;
+.scan-screen.active { display: flex; }
+
+/* ===== Capture View ===== */
+#captureView {
+  background: #000;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
-.scan-placeholder p {
+.capture-prompt {
+  text-align: center; color: #fff; padding: 24px;
+}
+.capture-prompt p {
+  font-size: 1.1rem; margin-bottom: 32px; opacity: 0.8;
+}
+.capture-label {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 4px solid #fff; background: rgba(255,255,255,0.25);
+  cursor: pointer; transition: background 0.2s;
+}
+.capture-label:active { background: rgba(255,255,255,0.55); }
+.capture-label svg { width: 36px; height: 36px; fill: #fff; }
+.capture-input { display: none; }
+
+/* ===== Crop View ===== */
+#cropView {
+  background: #000;
+  flex-direction: column;
+}
+#cropCanvas {
+  flex: 1;
+  width: 100%;
+  display: block;
+  touch-action: none;
+}
+.crop-controls {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 16px 24px;
+  display: flex; justify-content: center;
+  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  pointer-events: none;
+}
+.crop-controls button {
+  pointer-events: auto;
+}
+.btn-confirm-crop {
+  padding: 14px 48px; border-radius: 8px; border: none;
+  font-size: 1rem; font-weight: 600; cursor: pointer;
+  background: #fff; color: #111;
+}
+.btn-confirm-crop:active { opacity: 0.85; }
+
+/* ===== Preview View (placeholder) ===== */
+#previewView {
+  background: #111;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
   font-size: 1rem;
-  color: #666;
-  line-height: 1.5;
+  opacity: 0.5;
 }
+
+/* ===== Review View (placeholder) ===== */
+#reviewView {
+  background: #111;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1rem;
+  opacity: 0.5;
+}
+
+/* ===== Filmstrip Bar (placeholder) ===== */
+#filmstripBar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 80px;
+  background: #111;
+  display: none;
+}
+#filmstripBar.active { display: flex; }
+
+/* ===== Spinner Overlay ===== */
+#spinnerView {
+  background: rgba(0,0,0,0.75);
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.spinner {
+  width: 52px; height: 52px; border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 {{end}}
 
 {{define "content"}}
-<div class="scan-placeholder">
-  <h1>Document Scan</h1>
-  <p>Document scanning interface will be available soon.</p>
+<!-- Capture View -->
+<div class="scan-screen active" id="captureView">
+  <div class="capture-prompt">
+    <p>Tap to open camera</p>
+    <label class="capture-label" for="scanCameraInput">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
+        <path d="M9 2 7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
+      </svg>
+    </label>
+    <input type="file" id="scanCameraInput" class="capture-input" accept="image/*">
+  </div>
+</div>
+
+<!-- Crop View -->
+<div class="scan-screen" id="cropView">
+  <canvas id="cropCanvas"></canvas>
+  <div class="crop-controls">
+    <button class="btn-confirm-crop" onclick="confirmCrop()">Confirm</button>
+  </div>
+</div>
+
+<!-- Preview View (placeholder — implemented in 06-02) -->
+<div class="scan-screen" id="previewView">
+  <p>Preview — coming in plan 06-02</p>
+</div>
+
+<!-- Review View (placeholder — implemented in 06-03) -->
+<div class="scan-screen" id="reviewView">
+  <p>Review — coming in plan 06-03</p>
+</div>
+
+<!-- Filmstrip Bar (placeholder — implemented in 06-03) -->
+<div id="filmstripBar"></div>
+
+<!-- Spinner Overlay -->
+<div class="scan-screen" id="spinnerView">
+  <div class="spinner"></div>
 </div>
 {{end}}
 
-{{define "scripts"}}{{end}}
+{{define "scripts"}}
+<script>
+// ===== Template data =====
+const sessionID   = '{{.SessionID}}';
+const documentMode = '{{.ScanDocumentMode}}';
+const uploadURL   = '{{.ScanUploadURL}}';
+const finalizeURL = '{{.ScanFinalizeURL}}';
+
+// ===== State machine =====
+let state = 'capture'; // 'capture' | 'crop' | 'preview' | 'review'
+
+// ===== Crop state =====
+let currentSourceCanvas = null; // offscreen canvas with EXIF-corrected pixels
+let cropPoints = [];             // [[x,y],[x,y],[x,y],[x,y]] TL, TR, BR, BL in image pixel coords
+let activeHandle = null;         // index 0-3 while dragging, or null
+let scale   = 1;
+let offsetX = 0, offsetY = 0;
+let drawW   = 0, drawH   = 0;
+
+// ===== DOM refs =====
+const cropCanvas   = document.getElementById('cropCanvas');
+const cropCtx      = cropCanvas.getContext('2d');
+
+// ===== Screen switcher =====
+const ALL_SCREENS = ['captureView', 'cropView', 'previewView', 'reviewView', 'spinnerView'];
+
+function showScreen(name) {
+  ALL_SCREENS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', id === name);
+  });
+  state = name === 'captureView' ? 'capture'
+        : name === 'cropView'    ? 'crop'
+        : name === 'previewView' ? 'preview'
+        : name === 'reviewView'  ? 'review'
+        : state;
+}
+
+// ===== Camera input =====
+const scanCameraInput = document.getElementById('scanCameraInput');
+scanCameraInput.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  handleCapture(file);
+});
+
+// ===== EXIF normalization + capture handler =====
+async function handleCapture(file) {
+  currentSourceCanvas = await loadNormalizedImage(file);
+  initCropAndShow();
+}
+
+function loadNormalizedImage(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.style.imageOrientation = 'from-image'; // CSS EXIF normalization
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      URL.revokeObjectURL(img.src);
+      resolve(canvas);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function initCropAndShow() {
+  const w = currentSourceCanvas.width;
+  const h = currentSourceCanvas.height;
+  resizeCropCanvas();
+  initCropPoints(w, h);
+  showScreen('cropView');
+  drawCropFrame();
+}
+
+function initCropPoints(w, h) {
+  const m = 0.1;
+  cropPoints = [
+    [w * m,       h * m      ], // TL
+    [w * (1 - m), h * m      ], // TR
+    [w * (1 - m), h * (1 - m)], // BR
+    [w * m,       h * (1 - m)], // BL
+  ];
+}
+
+// ===== Crop canvas sizing =====
+function resizeCropCanvas() {
+  if (!currentSourceCanvas) return;
+  // Canvas size = the CSS-pixel size of the element
+  const rect = cropCanvas.getBoundingClientRect();
+  cropCanvas.width  = rect.width  || window.innerWidth;
+  cropCanvas.height = rect.height || (window.innerHeight - 0); // controls overlay, not above
+  recalcLayout();
+}
+
+function recalcLayout() {
+  const cw = cropCanvas.width;
+  const ch = cropCanvas.height;
+  const iw = currentSourceCanvas.width;
+  const ih = currentSourceCanvas.height;
+  scale = Math.min(cw / iw, ch / ih);
+  drawW = iw * scale;
+  drawH = ih * scale;
+  offsetX = (cw - drawW) / 2;
+  offsetY = (ch - drawH) / 2;
+}
+
+window.addEventListener('resize', () => {
+  if (state === 'crop') {
+    resizeCropCanvas();
+    drawCropFrame();
+  }
+});
+</script>
+{{end}}
