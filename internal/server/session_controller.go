@@ -14,9 +14,10 @@ import (
 type createSessionRequest struct {
 	ActionType   string `json:"action_type" binding:"required"`
 	IntroText    string `json:"intro_text"`
-	OutputFormat string `json:"output_format" binding:"required"`
-	SessionTTL   string `json:"session_ttl"` // optional, e.g. "30m", "1h"
-	ResultTTL    string `json:"result_ttl"`  // optional, e.g. "5m", "10m"
+	OutputFormat string `json:"output_format"` // required for photo/signature; optional for scan (defaults to "pdf")
+	DocumentMode string `json:"document_mode"` // scan only: "single" (default) or "multi"
+	SessionTTL   string `json:"session_ttl"`   // optional, e.g. "30m", "1h"
+	ResultTTL    string `json:"result_ttl"`    // optional, e.g. "5m", "10m"
 }
 
 // createSessionHandler returns a gin.HandlerFunc that creates a new session.
@@ -30,12 +31,6 @@ func (s *Server) createSessionHandler() gin.HandlerFunc {
 		}
 
 		actionType, err := model.ValidateActionType(req.ActionType)
-		if err != nil {
-			jsonError(c, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		outputFormat, err := model.ValidateOutputFormat(actionType, req.OutputFormat)
 		if err != nil {
 			jsonError(c, http.StatusBadRequest, err.Error())
 			return
@@ -78,16 +73,66 @@ func (s *Server) createSessionHandler() gin.HandlerFunc {
 		sessionID := model.NewSessionID()
 		sessionURL := config.Get().String("BASE_URL") + "/s/" + sessionID
 
-		session := model.Session{
-			ID:           sessionID,
-			ActionType:   actionType,
-			Status:       model.SessionStatusPending,
-			IntroText:    req.IntroText,
-			OutputFormat: outputFormat,
-			SessionTTL:   sessionTTL,
-			ResultTTL:    resultTTL,
-			URL:          sessionURL,
-			CreatedAt:    time.Now(),
+		var session model.Session
+
+		if actionType == model.ActionTypeScan {
+			// Scan sessions use their own document_mode and scan output format fields.
+
+			docModeStr := req.DocumentMode
+			if docModeStr == "" {
+				docModeStr = "single" // default
+			}
+			docMode, err := model.ValidateScanDocumentMode(docModeStr)
+			if err != nil {
+				jsonError(c, http.StatusBadRequest, err.Error())
+				return
+			}
+
+			scanFmtStr := req.OutputFormat
+			if scanFmtStr == "" {
+				scanFmtStr = "pdf" // default
+			}
+			scanFmt, err := model.ValidateScanOutputFormat(scanFmtStr)
+			if err != nil {
+				jsonError(c, http.StatusBadRequest, err.Error())
+				return
+			}
+
+			session = model.Session{
+				ID:               sessionID,
+				ActionType:       actionType,
+				Status:           model.SessionStatusPending,
+				IntroText:        req.IntroText,
+				ScanDocumentMode: docMode,
+				ScanOutputFormat: scanFmt,
+				SessionTTL:       sessionTTL,
+				ResultTTL:        resultTTL,
+				URL:              sessionURL,
+				CreatedAt:        time.Now(),
+			}
+		} else {
+			// Photo and signature sessions require a valid output_format.
+			if req.OutputFormat == "" {
+				jsonError(c, http.StatusBadRequest, "output_format is required")
+				return
+			}
+			outputFormat, err := model.ValidateOutputFormat(actionType, req.OutputFormat)
+			if err != nil {
+				jsonError(c, http.StatusBadRequest, err.Error())
+				return
+			}
+
+			session = model.Session{
+				ID:           sessionID,
+				ActionType:   actionType,
+				Status:       model.SessionStatusPending,
+				IntroText:    req.IntroText,
+				OutputFormat: outputFormat,
+				SessionTTL:   sessionTTL,
+				ResultTTL:    resultTTL,
+				URL:          sessionURL,
+				CreatedAt:    time.Now(),
+			}
 		}
 
 		if err := s.Store.CreateSession(&session); err != nil {

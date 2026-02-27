@@ -117,6 +117,8 @@ func (s *Server) renderActionPage(c *gin.Context, session *model.Session) {
 		templateName = "action_photo.html"
 	case model.ActionTypeSignature:
 		templateName = "action_signature.html"
+	case model.ActionTypeScan:
+		templateName = "action_scan.html"
 	default:
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.Status(http.StatusInternalServerError)
