@@ -369,15 +369,32 @@
           <select id="action-type">
             <option value="photo">Photo</option>
             <option value="signature">Signature</option>
+            <option value="scan">Document Scan</option>
           </select>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="output-format-group">
           <label for="output-format">Output Format</label>
           <select id="output-format">
             <option value="jpg">JPEG</option>
             <option value="png">PNG</option>
             <option value="pdf">PDF</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="doc-mode-group" style="display:none">
+          <label for="doc-mode">Document Mode</label>
+          <select id="doc-mode">
+            <option value="single">Single Document</option>
+            <option value="multi">Multiple Documents</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="scan-format-group" style="display:none">
+          <label for="scan-format">Scan Output Format</label>
+          <select id="scan-format">
+            <option value="pdf">PDF</option>
+            <option value="images">Individual Images</option>
           </select>
         </div>
       </div>
@@ -452,14 +469,23 @@
 
     function updateFormatOptions(actionType) {
       const select = document.getElementById('output-format');
-      const opts = formatOptions[actionType] || [];
-      select.innerHTML = '';
-      opts.forEach(function (o) {
-        const el = document.createElement('option');
-        el.value = o.value;
-        el.textContent = o.label;
-        select.appendChild(el);
-      });
+      const isScan = actionType === 'scan';
+
+      // Toggle visibility of scan-specific vs standard fields.
+      document.getElementById('output-format-group').style.display = isScan ? 'none' : '';
+      document.getElementById('doc-mode-group').style.display = isScan ? '' : 'none';
+      document.getElementById('scan-format-group').style.display = isScan ? '' : 'none';
+
+      if (!isScan) {
+        const opts = formatOptions[actionType] || [];
+        select.innerHTML = '';
+        opts.forEach(function (o) {
+          const el = document.createElement('option');
+          el.value = o.value;
+          el.textContent = o.label;
+          select.appendChild(el);
+        });
+      }
     }
 
     // Init format options on page load.
@@ -474,8 +500,15 @@
       errDiv.style.display = 'none';
 
       const actionType = document.getElementById('action-type').value;
-      const outputFormat = document.getElementById('output-format').value;
       const introText = document.getElementById('intro-text').value.trim();
+
+      const body = { action_type: actionType, intro_text: introText };
+      if (actionType === 'scan') {
+        body.document_mode = document.getElementById('doc-mode').value;
+        body.scan_output_format = document.getElementById('scan-format').value;
+      } else {
+        body.output_format = document.getElementById('output-format').value;
+      }
 
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span>Creating...';
@@ -483,7 +516,7 @@
       fetch('/api/create-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action_type: actionType, output_format: outputFormat, intro_text: introText }),
+        body: JSON.stringify(body),
       })
       .then(function (res) {
         return res.json().then(function (data) {
@@ -600,16 +633,24 @@
 
         const contentType = item.content_type || '';
         const isImage = contentType.startsWith('image/');
+        const isPDF = contentType === 'application/pdf';
 
         if (item.data_url && isImage) {
           const img = document.createElement('img');
           img.src = item.data_url;
           img.alt = item.filename || 'Result';
           div.appendChild(img);
+        } else if (item.data_url && isPDF) {
+          const embed = document.createElement('embed');
+          embed.src = item.data_url;
+          embed.type = 'application/pdf';
+          embed.style.width = '100%';
+          embed.style.height = '400px';
+          div.appendChild(embed);
         } else if (item.data_url) {
           const np = document.createElement('div');
           np.className = 'no-preview';
-          np.textContent = 'Preview not available';
+          np.textContent = 'Preview not available (' + contentType + ')';
           div.appendChild(np);
         } else {
           const np = document.createElement('div');
@@ -657,8 +698,10 @@
       document.getElementById('create-btn').disabled = false;
       document.getElementById('create-btn').textContent = 'Create Session';
 
-      // Reset format dropdown to first action type.
+      // Reset form to default state.
       document.getElementById('action-type').value = 'photo';
+      document.getElementById('doc-mode').value = 'single';
+      document.getElementById('scan-format').value = 'pdf';
       updateFormatOptions('photo');
     }
   </script>

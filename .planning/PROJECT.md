@@ -12,27 +12,37 @@ A calling backend can create a session, generate a QR code URL, and receive the 
 
 ### Validated
 
-(None yet — ship to validate)
+<!-- Shipped in v1.0 and confirmed working -->
+
+- ✓ Calling backends authenticate via API keys (multiple keys, each identifying a caller) — v1.0
+- ✓ Backend creates a session specifying: action type, optional intro text, result format, TTLs — v1.0
+- ✓ Session creation returns a unique URL suitable for QR code encoding — v1.0
+- ✓ Phone user scans QR, sees optional intro/explanation page, then performs the action — v1.0
+- ✓ Action: take a generic photo via phone camera — v1.0
+- ✓ Action: sign a document using full-screen touch signature field (undo/redo support) — v1.0
+- ✓ Results transmitted from phone UI to Handoff backend via HTTP form submissions — v1.0
+- ✓ Caller retrieves results via API polling or real-time WebSocket notification — v1.0
+- ✓ Session validity defaults to 30 minutes (configurable per session) — v1.0
+- ✓ Result availability defaults to 1 minute after completion (configurable) — v1.0
+- ✓ Result format is configurable by the caller at session creation — v1.0
+- ✓ Server-rendered UI using Go HTML templates with plain HTML/CSS/JavaScript — v1.0
+- ✓ Static assets embedded in Go binary via `embed.FS` — v1.0
+- ✓ Go client library (`pkg/`) for easy integration from other Go applications — v1.0
+- ✓ Health and version API endpoints — v1.0
+- ✓ Graceful shutdown on SIGINT/SIGTERM — v1.0
 
 ### Active
 
-- [ ] Calling backends authenticate via API keys (multiple keys, each identifying a caller)
-- [ ] Backend creates a session specifying: action type, optional intro text, result format, TTLs
-- [ ] Session creation returns a unique URL suitable for QR code encoding
-- [ ] Phone user scans QR, sees optional intro/explanation page, then performs the action
-- [ ] Action: document scanning (multiple pages/documents per session via phone camera)
-- [ ] Action: take a generic photo via phone camera
-- [ ] Action: sign a document using full-screen touch signature field (undo/redo support)
-- [ ] Results transmitted from phone UI to Handoff backend via HTTP form submissions
-- [ ] Caller retrieves results via API polling or real-time WebSocket notification
-- [ ] Session validity defaults to 30 minutes (configurable per session)
-- [ ] Result availability defaults to 1 minute after completion (configurable)
-- [ ] Result format is configurable by the caller at session creation
-- [ ] Server-rendered UI using Go HTML templates with plain HTML/CSS/JavaScript
-- [ ] Static assets embedded in Go binary via `embed.FS`
-- [ ] Go client library (`pkg/`) for easy integration from other Go applications
-- [ ] Health and version API endpoints
-- [ ] Graceful shutdown on SIGINT/SIGTERM
+- [ ] Action: document scanning with manual crop and perspective correction
+- [ ] Caller specifies single-document or multi-document mode at session creation
+- [ ] Phone user chooses single-page or multi-page capture mode
+- [ ] Crop UI with 4 corner handles positioned outside the crop area
+- [ ] Offset magnifying glass shows exact corner position under user's finger
+- [ ] Client-side perspective warp via Canvas before upload
+- [ ] Preview of cropped result with ability to re-crop
+- [ ] Multi-document sessions: "Next Document" button separates document boundaries
+- [ ] Results structured as nested array of documents, each with array of pages
+- [ ] Output format: multi-page PDF per document or individual page images (caller's choice)
 
 ### Out of Scope
 
@@ -41,6 +51,7 @@ A calling backend can create a session, generate a QR code URL, and receive the 
 - OAuth/OIDC authentication — API key auth only for v1
 - Mobile native app — web-only, phone accesses via browser
 - Real-time chat or streaming — simple request/response with WebSocket for status updates
+- Auto edge detection for document scanning — deferred to future milestone, manual crop first
 
 ## Context
 
@@ -71,5 +82,16 @@ A calling backend can create a session, generate a QR code URL, and receive the 
 | Go client library in `pkg/` | First-class Go integration alongside HTTP API | — Pending |
 | Result delivery via polling + WebSocket | Caller chooses push or pull; no webhook complexity for v1 | — Pending |
 
+## Current Milestone: v1.1 Document Scanning
+
+**Goal:** Add document scanning action type with manual crop, perspective correction, multi-page and multi-document support.
+
+**Target features:**
+- Document scanning with manual 4-corner crop and client-side perspective warp
+- Single-page and multi-page capture modes (user's choice)
+- Single-document and multi-document modes (caller specifies)
+- Touch-friendly crop handles with offset magnifying glass for precision
+- Nested result structure (documents → pages) with PDF or image output
+
 ---
-*Last updated: 2026-02-26 after initialization*
+*Last updated: 2026-02-27 after v1.1 milestone start*

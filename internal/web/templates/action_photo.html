@@ -1,22 +1,24 @@
 {{define "styles"}}
-.camera-container {
+.photo-container {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background: #000; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
 }
-video {
-  flex: 1; width: 100%; object-fit: cover;
+.capture-prompt {
+  text-align: center; color: #fff; padding: 24px;
 }
-.camera-controls {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  padding: 24px; display: flex; justify-content: center;
-  background: linear-gradient(transparent, rgba(0,0,0,0.6));
+.capture-prompt p {
+  font-size: 1.1rem; margin-bottom: 32px; opacity: 0.8;
 }
-.capture-btn {
+.capture-label {
+  display: inline-flex; align-items: center; justify-content: center;
   width: 72px; height: 72px; border-radius: 50%;
   border: 4px solid #fff; background: rgba(255,255,255,0.3);
   cursor: pointer; transition: background 0.2s;
 }
-.capture-btn:active { background: rgba(255,255,255,0.6); }
+.capture-label:active { background: rgba(255,255,255,0.6); }
+.capture-label svg { width: 32px; height: 32px; fill: #fff; }
+.capture-input { display: none; }
 .preview-container {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background: #000; display: none; flex-direction: column;
@@ -36,13 +38,6 @@ video {
 }
 .btn-retake { background: rgba(255,255,255,0.2); color: #fff; }
 .btn-submit { background: #fff; color: #111; }
-.error-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: #fff; display: none; flex-direction: column;
-  align-items: center; justify-content: center; padding: 24px;
-  text-align: center;
-}
-.error-overlay.active { display: flex; }
 .spinner-overlay {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background: rgba(0,0,0,0.7); display: none;
@@ -58,11 +53,14 @@ video {
 {{end}}
 
 {{define "content"}}
-<!-- Camera viewfinder -->
-<div class="camera-container" id="cameraView">
-  <video id="video" autoplay playsinline></video>
-  <div class="camera-controls">
-    <button class="capture-btn" id="captureBtn" onclick="capturePhoto()"></button>
+<!-- Capture prompt -->
+<div class="photo-container" id="captureView">
+  <div class="capture-prompt">
+    <p>Tap to open camera</p>
+    <label class="capture-label" for="cameraInput">
+      <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2 7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+    </label>
+    <input type="file" id="cameraInput" class="capture-input" accept="image/*" capture="environment">
   </div>
 </div>
 
@@ -75,113 +73,60 @@ video {
   </div>
 </div>
 
-<!-- Error state -->
-<div class="error-overlay" id="errorView">
-  <div style="font-size: 3rem; margin-bottom: 24px;">&#128247;</div>
-  <h1>Camera Access Required</h1>
-  <p id="errorMsg">Please allow camera access to take a photo.</p>
-</div>
-
 <!-- Loading spinner -->
 <div class="spinner-overlay" id="spinnerView">
   <div class="spinner"></div>
 </div>
-
-<!-- Hidden canvas for photo capture -->
-<canvas id="canvas" style="display:none;"></canvas>
 {{end}}
 
 {{define "scripts"}}
 <script>
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
+const cameraInput = document.getElementById('cameraInput');
 const previewImg = document.getElementById('previewImg');
-const cameraView = document.getElementById('cameraView');
+const captureView = document.getElementById('captureView');
 const previewView = document.getElementById('previewView');
-const errorView = document.getElementById('errorView');
 const spinnerView = document.getElementById('spinnerView');
-const errorMsg = document.getElementById('errorMsg');
 
 const sessionID = '{{.SessionID}}';
 const submitURL = '{{.SubmitURL}}';
 const outputFormat = '{{.OutputFormat}}';
 
-let capturedDataURL = null;
-let stream = null;
+let capturedFile = null;
 
-async function initCamera() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 4096 },
-        height: { ideal: 2160 },
-      },
-      audio: false
-    });
-    video.srcObject = stream;
-  } catch (err) {
-    console.error('Camera error:', err);
-    cameraView.style.display = 'none';
-    errorView.classList.add('active');
-    if (err.name === 'NotAllowedError') {
-      errorMsg.textContent = 'Camera permission was denied. Please allow camera access in your browser settings and reload.';
-    } else if (err.name === 'NotFoundError') {
-      errorMsg.textContent = 'No camera found on this device.';
-    } else {
-      errorMsg.textContent = 'Could not access the camera: ' + err.message;
-    }
-  }
-}
+cameraInput.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
 
-function capturePhoto() {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0);
-
-  // Determine MIME type and quality based on output format
-  // For "pdf" output, capture as JPEG (caller handles PDF conversion)
-  let mimeType = 'image/jpeg';
-  let quality = 0.92;
-  if (outputFormat === 'png') {
-    mimeType = 'image/png';
-    quality = undefined;
-  }
-
-  capturedDataURL = canvas.toDataURL(mimeType, quality);
-  previewImg.src = capturedDataURL;
-
-  // Show preview, hide camera
-  cameraView.style.display = 'none';
+  capturedFile = file;
+  previewImg.src = URL.createObjectURL(file);
+  captureView.style.display = 'none';
   previewView.classList.add('active');
-
-  // Stop camera while previewing to save battery
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-  }
-}
+});
 
 function retakePhoto() {
-  capturedDataURL = null;
+  if (previewImg.src.startsWith('blob:')) {
+    URL.revokeObjectURL(previewImg.src);
+  }
+  capturedFile = null;
+  cameraInput.value = '';
   previewView.classList.remove('active');
-  cameraView.style.display = 'flex';
-  initCamera();
+  captureView.style.display = 'flex';
 }
 
 async function submitPhoto() {
-  if (!capturedDataURL) return;
+  if (!capturedFile) return;
 
   spinnerView.classList.add('active');
   document.getElementById('submitBtn').disabled = true;
 
   try {
-    // Extract base64 data (remove data URL prefix)
-    const base64Data = capturedDataURL.split(',')[1];
-    // For "pdf" output format, capture as JPEG (caller handles PDF conversion)
-    const mimeType = outputFormat === 'png' ? 'image/png' : 'image/jpeg';
-    const ext = outputFormat === 'png' ? 'png' : 'jpg';
+    const arrayBuffer = await capturedFile.arrayBuffer();
+    const base64Data = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+
+    const mimeType = capturedFile.type || 'image/jpeg';
+    const ext = mimeType === 'image/png' ? 'png' : 'jpg';
 
     const payload = {
       items: [{
@@ -198,7 +143,6 @@ async function submitPhoto() {
     });
 
     if (response.ok) {
-      // Redirect to success page
       window.location.href = '/s/' + sessionID;
     } else {
       const err = await response.json().catch(() => ({}));
@@ -210,8 +154,5 @@ async function submitPhoto() {
     alert('Failed to submit photo: ' + err.message);
   }
 }
-
-// Initialize camera on page load
-initCamera();
 </script>
 {{end}}

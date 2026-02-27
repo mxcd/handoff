@@ -302,7 +302,7 @@
         <path d="M9 2 7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
       </svg>
     </label>
-    <input type="file" id="scanCameraInput" class="capture-input" accept="image/*">
+    <input type="file" id="scanCameraInput" class="capture-input" accept="image/*" capture="environment">
   </div>
 </div>
 
@@ -353,7 +353,88 @@
 
 {{define "scripts"}}
 <script type="module">
-import { Homography } from "https://cdn.jsdelivr.net/gh/Eric-Canas/Homography.js@1.8.1/Homography.js";
+// ===== Perspective warp: manual inverse-mapping homography =====
+// Computes a 3x3 homography matrix from 4 point correspondences.
+// Maps points in coordinate system A to coordinate system B.
+// src[i] → dst[i] for i=0..3
+function computeHomography(src, dst) {
+  // Build 8x8 system: A * h = b
+  // h = [h0,h1,h2,h3,h4,h5,h6,h7], matrix is [[h0,h1,h2],[h3,h4,h5],[h6,h7,1]]
+  const A = [];
+  const b = [];
+  for (let i = 0; i < 4; i++) {
+    const [x, y] = src[i];
+    const [xp, yp] = dst[i];
+    A.push([x, y, 1, 0, 0, 0, -x * xp, -y * xp]);
+    b.push(xp);
+    A.push([0, 0, 0, x, y, 1, -x * yp, -y * yp]);
+    b.push(yp);
+  }
+  // Gaussian elimination with partial pivoting
+  const n = 8;
+  for (let col = 0; col < n; col++) {
+    let maxRow = col;
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(A[row][col]) > Math.abs(A[maxRow][col])) maxRow = row;
+    }
+    [A[col], A[maxRow]] = [A[maxRow], A[col]];
+    [b[col], b[maxRow]] = [b[maxRow], b[col]];
+    const pivot = A[col][col];
+    if (Math.abs(pivot) < 1e-12) continue;
+    for (let row = col + 1; row < n; row++) {
+      const factor = A[row][col] / pivot;
+      for (let j = col; j < n; j++) A[row][j] -= factor * A[col][j];
+      b[row] -= factor * b[col];
+    }
+  }
+  // Back substitution
+  const h = new Array(n);
+  for (let row = n - 1; row >= 0; row--) {
+    let sum = b[row];
+    for (let j = row + 1; j < n; j++) sum -= A[row][j] * h[j];
+    h[row] = sum / A[row][row];
+  }
+  return h; // [h0,h1,h2,h3,h4,h5,h6,h7], h8=1
+}
+
+// Perform inverse-mapped perspective warp: for each output pixel, sample from source
+function perspectiveWarp(srcData, srcW, srcH, dstW, dstH, h) {
+  const out = new ImageData(dstW, dstH);
+  const od = out.data;
+  const sd = srcData.data;
+  const srcStride = srcW * 4;
+
+  for (let y = 0; y < dstH; y++) {
+    for (let x = 0; x < dstW; x++) {
+      const w = h[6] * x + h[7] * y + 1;
+      const sx = (h[0] * x + h[1] * y + h[2]) / w;
+      const sy = (h[3] * x + h[4] * y + h[5]) / w;
+
+      // Bilinear interpolation
+      const x0 = Math.floor(sx), y0 = Math.floor(sy);
+      const x1 = x0 + 1, y1 = y0 + 1;
+      if (x0 < 0 || y0 < 0 || x1 >= srcW || y1 >= srcH) continue;
+
+      const fx = sx - x0, fy = sy - y0;
+      const w00 = (1 - fx) * (1 - fy);
+      const w10 = fx * (1 - fy);
+      const w01 = (1 - fx) * fy;
+      const w11 = fx * fy;
+
+      const i00 = y0 * srcStride + x0 * 4;
+      const i10 = i00 + 4;
+      const i01 = i00 + srcStride;
+      const i11 = i01 + 4;
+
+      const oi = (y * dstW + x) * 4;
+      od[oi]     = sd[i00]     * w00 + sd[i10]     * w10 + sd[i01]     * w01 + sd[i11]     * w11;
+      od[oi + 1] = sd[i00 + 1] * w00 + sd[i10 + 1] * w10 + sd[i01 + 1] * w01 + sd[i11 + 1] * w11;
+      od[oi + 2] = sd[i00 + 2] * w00 + sd[i10 + 2] * w10 + sd[i01 + 2] * w01 + sd[i11 + 2] * w11;
+      od[oi + 3] = 255;
+    }
+  }
+  return out;
+}
 
 // ===== Template data =====
 const sessionID   = '{{.SessionID}}';
@@ -483,14 +564,25 @@ function initCropPoints(w, h) {
 function resizeCropCanvas() {
   if (!currentSourceCanvas) return;
   const rect = cropCanvas.getBoundingClientRect();
-  cropCanvas.width  = rect.width  || window.innerWidth;
-  cropCanvas.height = rect.height || window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = rect.width  || window.innerWidth;
+  const cssH = rect.height || window.innerHeight;
+  // Set canvas backing store to native resolution for sharp rendering
+  cropCanvas.width  = cssW * dpr;
+  cropCanvas.height = cssH * dpr;
+  cropCanvas.style.width  = cssW + 'px';
+  cropCanvas.style.height = cssH + 'px';
+  cropCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   recalcLayout();
 }
 
+function getCSSCanvasSize() {
+  const dpr = window.devicePixelRatio || 1;
+  return { width: cropCanvas.width / dpr, height: cropCanvas.height / dpr };
+}
+
 function recalcLayout() {
-  const cw = cropCanvas.width;
-  const ch = cropCanvas.height;
+  const { width: cw, height: ch } = getCSSCanvasSize();
   const iw = currentSourceCanvas.width;
   const ih = currentSourceCanvas.height;
   scale = Math.min(cw / iw, ch / ih);
@@ -518,8 +610,7 @@ function drawCropFrame() {
   if (!currentSourceCanvas || cropPoints.length < 4) return;
 
   const ctx = cropCtx;
-  const cw  = cropCanvas.width;
-  const ch  = cropCanvas.height;
+  const { width: cw, height: ch } = getCSSCanvasSize();
 
   // Map crop points from image coords to canvas CSS-pixel coords
   const pts = cropPoints.map(([x, y]) => [
@@ -607,7 +698,7 @@ function drawHandles(ctx, pts) {
 
 // ===== Magnifying glass loupe =====
 const LOUPE_R     = 50; // px radius
-const LOUPE_ZOOM  = 3;  // 3x magnification
+const LOUPE_ZOOM  = 2;  // 2x magnification
 const LOUPE_OFFSET_X = 80; // default horizontal offset from finger
 const LOUPE_OFFSET_Y = 80; // default vertical offset (above finger)
 
@@ -621,7 +712,7 @@ function drawLoupe(ctx, canvasX, canvasY) {
   if (canvasY < 150) {
     loupeY = canvasY + LOUPE_OFFSET_Y;
   }
-  if (loupeX + LOUPE_R + 10 > cropCanvas.width) {
+  if (loupeX + LOUPE_R + 10 > getCSSCanvasSize().width) {
     loupeX = canvasX - LOUPE_OFFSET_X;
   }
   if (loupeX - LOUPE_R - 10 < 0) {
@@ -697,7 +788,21 @@ cropCanvas.addEventListener('pointercancel', function() {
   drawCropFrame();
 });
 
-// ===== Confirm Crop: perspective warp via Homography.js =====
+// ===== Normalize crop point ordering =====
+// Given 4 arbitrary points, determine correct TL, TR, BR, BL order
+// based on spatial position, not array index. This ensures the homography
+// produces correct results even when the user drags corners past each other.
+function normalizeCropPointOrder(points) {
+  // Sort by Y to separate top pair from bottom pair
+  const sorted = [...points].sort((a, b) => a[1] - b[1]);
+  // Top two: sort by X → left is TL, right is TR
+  const topPair = sorted.slice(0, 2).sort((a, b) => a[0] - b[0]);
+  // Bottom two: sort by X → left is BL, right is BR
+  const bottomPair = sorted.slice(2, 4).sort((a, b) => a[0] - b[0]);
+  return [topPair[0], topPair[1], bottomPair[1], bottomPair[0]]; // TL, TR, BR, BL
+}
+
+// ===== Confirm Crop: perspective warp =====
 async function confirmCrop() {
   if (!currentSourceCanvas || cropPoints.length < 4) return;
 
@@ -707,8 +812,11 @@ async function confirmCrop() {
     const W = currentSourceCanvas.width;
     const H = currentSourceCanvas.height;
 
+    // Normalize point order so TL/TR/BR/BL are spatially correct
+    const ordered = normalizeCropPointOrder(cropPoints);
+    const [tl, tr, br, bl] = ordered;
+
     // Compute output dimensions from edge lengths
-    const [tl, tr, br, bl] = cropPoints;
     const topLen    = Math.hypot(tr[0] - tl[0], tr[1] - tl[1]);
     const leftLen   = Math.hypot(bl[0] - tl[0], bl[1] - tl[1]);
     const bottomLen = Math.hypot(br[0] - bl[0], br[1] - bl[1]);
@@ -723,32 +831,24 @@ async function confirmCrop() {
     const finalW = Math.round(outW * warpScale);
     const finalH = Math.round(outH * warpScale);
 
-    // Get ImageData from source canvas
+    // Get source pixel data
     const srcCtx = currentSourceCanvas.getContext('2d');
-    const imageData = srcCtx.getImageData(0, 0, W, H);
+    const srcImageData = srcCtx.getImageData(0, 0, W, H);
 
-    // Normalize source points to 0..1 range
-    const src = cropPoints.map(([x, y]) => [x / W, y / H]);
-    // Destination = unit rectangle corners TL, TR, BR, BL
-    const dst = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    // Compute homography: output rectangle → source quad (inverse mapping)
+    // For each output pixel we look up where it comes from in the source
+    const dstRect = [[0, 0], [finalW, 0], [finalW, finalH], [0, finalH]]; // TL, TR, BR, BL
+    const srcQuad = [tl, tr, br, bl];
+    const h = computeHomography(dstRect, srcQuad);
 
-    // Perspective warp
-    const h = new Homography("projective");
-    h.setReferencePoints(src, dst, imageData);
-    const warpedImageData = h.warp();
+    // Perspective warp: produces exactly finalW x finalH output
+    const warpedImageData = perspectiveWarp(srcImageData, W, H, finalW, finalH, h);
 
-    // Render warped result to output canvas
     const outCanvas = document.createElement('canvas');
     outCanvas.width  = finalW;
     outCanvas.height = finalH;
     const outCtx = outCanvas.getContext('2d');
-
-    // warp() returns ImageData at original ratio; scale it to finalW x finalH
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width  = warpedImageData.width;
-    tempCanvas.height = warpedImageData.height;
-    tempCanvas.getContext('2d').putImageData(warpedImageData, 0, 0);
-    outCtx.drawImage(tempCanvas, 0, 0, finalW, finalH);
+    outCtx.putImageData(warpedImageData, 0, 0);
 
     // Convert to JPEG blob (0.9 quality) and store
     currentWarpedBlob = await new Promise(resolve => {
@@ -756,9 +856,11 @@ async function confirmCrop() {
     });
 
     // Generate thumbnail (max 56x64) for filmstrip
-    const thumbScale = Math.min(56 / finalW, 64 / finalH);
-    const thumbW = Math.round(finalW * thumbScale);
-    const thumbH = Math.round(finalH * thumbScale);
+    const actualW = outCanvas.width;
+    const actualH = outCanvas.height;
+    const thumbScale = Math.min(56 / actualW, 64 / actualH);
+    const thumbW = Math.round(actualW * thumbScale);
+    const thumbH = Math.round(actualH * thumbScale);
     const thumbCanvas = document.createElement('canvas');
     thumbCanvas.width  = thumbW;
     thumbCanvas.height = thumbH;
@@ -802,70 +904,21 @@ function recropScan() {
 async function acceptPage() {
   if (!currentWarpedBlob) return;
 
-  if (documentMode === 'single') {
-    // Single-page mode: upload + finalize + redirect
-    acceptBtn.disabled = true;
-    showSpinner('Uploading...');
-
-    try {
-      const fd = new FormData();
-      fd.append('file', currentWarpedBlob, 'scan.jpg');
-      fd.append('document_index', '0');
-      fd.append('page_index', '0');
-
-      const uploadResp = await fetch(uploadURL, { method: 'POST', body: fd });
-
-      if (uploadResp.status === 410) {
-        alert('Session expired.');
-        window.location.href = '/s/' + sessionID;
-        return;
-      }
-      if (uploadResp.status === 409) {
-        window.location.href = '/s/' + sessionID;
-        return;
-      }
-      if (!uploadResp.ok) {
-        const err = await uploadResp.json().catch(() => ({}));
-        throw new Error(err.error || 'Upload failed (' + uploadResp.status + ')');
-      }
-
-      const finalizeResp = await fetch(finalizeURL, { method: 'POST' });
-
-      if (finalizeResp.status === 410) {
-        alert('Session expired.');
-        window.location.href = '/s/' + sessionID;
-        return;
-      }
-      if (!finalizeResp.ok) {
-        const err = await finalizeResp.json().catch(() => ({}));
-        throw new Error(err.error || 'Finalize failed (' + finalizeResp.status + ')');
-      }
-
-      // Cleanup object URLs
-      if (previewImg.src.startsWith('blob:')) URL.revokeObjectURL(previewImg.src);
-      if (currentThumbnailURL) URL.revokeObjectURL(currentThumbnailURL);
-
-      window.location.href = '/s/' + sessionID;
-    } catch (err) {
-      showScreen('preview');
-      acceptBtn.disabled = false;
-      alert('Submit failed: ' + err.message);
-    }
-  } else {
-    // Multi-page mode: store page, update filmstrip, return to capture
-    pages.push({
-      docIndex: currentDocIndex,
-      blob: currentWarpedBlob,
-      thumbnailURL: currentThumbnailURL,
-    });
-    currentWarpedBlob = null;
-    currentThumbnailURL = null;
-    currentSourceCanvas = null;
-    cropPoints = [];
-    scanCameraInput.value = '';
-    renderFilmstrip();
-    showScreen('capture');
-  }
+  // Always use multi-page flow: store page, show filmstrip, return to capture.
+  // In single document mode, all pages go into document index 0.
+  // In multi document mode, pages can be grouped into separate documents.
+  pages.push({
+    docIndex: currentDocIndex,
+    blob: currentWarpedBlob,
+    thumbnailURL: currentThumbnailURL,
+  });
+  currentWarpedBlob = null;
+  currentThumbnailURL = null;
+  currentSourceCanvas = null;
+  cropPoints = [];
+  scanCameraInput.value = '';
+  renderFilmstrip();
+  showScreen('capture');
 }
 
 // ===== Filmstrip rendering =====

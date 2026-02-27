@@ -37,9 +37,11 @@ type sessionEntry struct {
 
 // createSessionRequest is the JSON body for POST /api/create-session.
 type createSessionRequest struct {
-	ActionType   string `json:"action_type"`
-	OutputFormat string `json:"output_format"`
-	IntroText    string `json:"intro_text"`
+	ActionType       string `json:"action_type"`
+	OutputFormat     string `json:"output_format"`
+	IntroText        string `json:"intro_text"`
+	DocumentMode     string `json:"document_mode,omitempty"`
+	ScanOutputFormat string `json:"scan_output_format,omitempty"`
 }
 
 // createSessionResponse is the JSON response for POST /api/create-session.
@@ -226,33 +228,57 @@ func (s *server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		actionType = handoff.ActionTypePhoto
 	case "signature":
 		actionType = handoff.ActionTypeSignature
+	case "scan":
+		actionType = handoff.ActionTypeScan
 	default:
-		jsonError(w, http.StatusBadRequest, "invalid action_type: must be 'photo' or 'signature'")
-		return
-	}
-
-	// Validate output format.
-	var outputFormat handoff.OutputFormat
-	switch req.OutputFormat {
-	case "jpg":
-		outputFormat = handoff.OutputFormatJPG
-	case "png":
-		outputFormat = handoff.OutputFormatPNG
-	case "pdf":
-		outputFormat = handoff.OutputFormatPDF
-	case "svg":
-		outputFormat = handoff.OutputFormatSVG
-	default:
-		jsonError(w, http.StatusBadRequest, "invalid output_format: must be jpg, png, pdf, or svg")
+		jsonError(w, http.StatusBadRequest, "invalid action_type: must be 'photo', 'signature', or 'scan'")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	builder := s.client.NewSession().
-		WithAction(actionType).
-		WithOutputFormat(outputFormat)
+	builder := s.client.NewSession().WithAction(actionType)
+
+	if actionType == handoff.ActionTypeScan {
+		// Scan sessions use document_mode and scan_output_format instead of output_format.
+		var docMode handoff.ScanDocumentMode
+		switch req.DocumentMode {
+		case "single":
+			docMode = handoff.ScanDocumentModeSingle
+		case "multi":
+			docMode = handoff.ScanDocumentModeMulti
+		default:
+			docMode = handoff.ScanDocumentModeSingle
+		}
+		builder = builder.WithDocumentMode(docMode)
+
+		var scanFmt handoff.ScanOutputFormat
+		switch req.ScanOutputFormat {
+		case "images":
+			scanFmt = handoff.ScanOutputFormatImages
+		default:
+			scanFmt = handoff.ScanOutputFormatPDF
+		}
+		builder = builder.WithScanOutputFormat(scanFmt)
+	} else {
+		// Photo/signature sessions use output_format.
+		var outputFormat handoff.OutputFormat
+		switch req.OutputFormat {
+		case "jpg":
+			outputFormat = handoff.OutputFormatJPG
+		case "png":
+			outputFormat = handoff.OutputFormatPNG
+		case "pdf":
+			outputFormat = handoff.OutputFormatPDF
+		case "svg":
+			outputFormat = handoff.OutputFormatSVG
+		default:
+			jsonError(w, http.StatusBadRequest, "invalid output_format: must be jpg, png, pdf, or svg")
+			return
+		}
+		builder = builder.WithOutputFormat(outputFormat)
+	}
 
 	if req.IntroText != "" {
 		builder = builder.WithIntro(req.IntroText)
@@ -392,27 +418,69 @@ func (s *server) handleSessionEvents(w http.ResponseWriter, r *http.Request, ses
 
 			if evt.Type == "completed" {
 				// Download all result files for preview.
-				previews := make([]previewItem, 0, len(evt.Result))
+				var previews []previewItem
 				downloadCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-				for _, item := range evt.Result {
-					data, contentType, err := s.client.DownloadFile(downloadCtx, item.DownloadID)
-					if err != nil {
-						log.Printf("Failed to download result %s: %v", item.DownloadID, err)
+
+				if evt.ScanResult != nil && len(evt.ScanResult.Documents) > 0 {
+					// Scan session: extract download URLs from ScanResult.
+					for di, doc := range evt.ScanResult.Documents {
+						if doc.PDFURL != "" {
+							dlID := extractDownloadID(doc.PDFURL)
+							filename := fmt.Sprintf("document_%d.pdf", di+1)
+							data, ct, err := s.client.DownloadFile(downloadCtx, dlID)
+							if err != nil {
+								log.Printf("Failed to download scan PDF %s: %v", dlID, err)
+								previews = append(previews, previewItem{
+									DownloadID: dlID, ContentType: "application/pdf", Filename: filename,
+								})
+								continue
+							}
+							encoded := base64.StdEncoding.EncodeToString(data)
+							previews = append(previews, previewItem{
+								DownloadID: dlID, ContentType: ct, Filename: filename,
+								DataURL: fmt.Sprintf("data:%s;base64,%s", ct, encoded),
+							})
+						}
+						for pi, page := range doc.Pages {
+							dlID := extractDownloadID(page.URL)
+							filename := fmt.Sprintf("document_%d_page_%d.jpg", di+1, pi+1)
+							data, ct, err := s.client.DownloadFile(downloadCtx, dlID)
+							if err != nil {
+								log.Printf("Failed to download scan page %s: %v", dlID, err)
+								previews = append(previews, previewItem{
+									DownloadID: dlID, ContentType: page.ContentType, Filename: filename,
+								})
+								continue
+							}
+							encoded := base64.StdEncoding.EncodeToString(data)
+							previews = append(previews, previewItem{
+								DownloadID: dlID, ContentType: ct, Filename: filename,
+								DataURL: fmt.Sprintf("data:%s;base64,%s", ct, encoded),
+							})
+						}
+					}
+				} else {
+					// Photo/signature session: use ResultItem list.
+					for _, item := range evt.Result {
+						data, contentType, err := s.client.DownloadFile(downloadCtx, item.DownloadID)
+						if err != nil {
+							log.Printf("Failed to download result %s: %v", item.DownloadID, err)
+							previews = append(previews, previewItem{
+								DownloadID:  item.DownloadID,
+								ContentType: item.ContentType,
+								Filename:    item.Filename,
+							})
+							continue
+						}
+						encoded := base64.StdEncoding.EncodeToString(data)
+						dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, encoded)
 						previews = append(previews, previewItem{
 							DownloadID:  item.DownloadID,
-							ContentType: item.ContentType,
+							ContentType: contentType,
 							Filename:    item.Filename,
+							DataURL:     dataURL,
 						})
-						continue
 					}
-					encoded := base64.StdEncoding.EncodeToString(data)
-					dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, encoded)
-					previews = append(previews, previewItem{
-						DownloadID:  item.DownloadID,
-						ContentType: contentType,
-						Filename:    item.Filename,
-						DataURL:     dataURL,
-					})
 				}
 				cancel()
 
@@ -458,6 +526,19 @@ func (s *server) handleSessionDownload(w http.ResponseWriter, r *http.Request, d
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	w.Write(data)
+}
+
+// extractDownloadID extracts the download ID from a URL like "/api/v1/downloads/{id}".
+func extractDownloadID(url string) string {
+	const prefix = "/api/v1/downloads/"
+	if idx := strings.LastIndex(url, prefix); idx >= 0 {
+		return url[idx+len(prefix):]
+	}
+	// If it doesn't match the expected pattern, return as-is (might already be an ID).
+	if idx := strings.LastIndex(url, "/"); idx >= 0 {
+		return url[idx+1:]
+	}
+	return url
 }
 
 // jsonError writes a JSON error response.
