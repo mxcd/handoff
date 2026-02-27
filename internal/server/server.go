@@ -90,6 +90,10 @@ func (s *Server) RegisterRoutes() error {
 	// Session action routes (public — phone UI submits results via session UUID)
 	s.Engine.POST("/s/:id/result", s.submitResultHandler())
 
+	// Scan session routes (public — session UUID is the auth)
+	s.Engine.POST("/s/:id/scan/upload", s.scanUploadHandler())
+	s.Engine.POST("/s/:id/scan/finalize", s.scanFinalizeHandler())
+
 	// Static files are public (no middleware)
 	web.RegisterStaticFiles(s.Engine)
 	return nil
