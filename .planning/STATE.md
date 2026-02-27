@@ -8,7 +8,7 @@ progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 0
-  completed_plans: 1
+  completed_plans: 3
 ---
 
 # Project State
@@ -23,24 +23,24 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 ## Current Position
 
 Phase: 5 of 6 (Scan Server Infrastructure)
-Plan: 1 of TBD in current phase
+Plan: 3 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-27 — Completed 05-01 (scan model, PDF library migration, store extension)
+Last activity: 2026-02-27 — Completed 05-03 (client library scan support)
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v1.1)
+- Total plans completed: 3 (v1.1)
 - Average duration: 3 min
-- Total execution time: 3 min
+- Total execution time: 9 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 05-scan-server-infrastructure | 1 | 3 min | 3 min |
+| 05-scan-server-infrastructure | 3 | 9 min | 3 min |
 
 *Updated after each plan completion*
 
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - ScanPageData (store raw bytes) kept separate from model.ScanPage (result URL type) — decouples store internals from API result shape
 - ValidateOutputFormat for ActionTypeScan returns empty string, no error — scan sessions use ScanOutputFormat instead of the shared OutputFormat field
 - scanPages cache initialized with 24h tombstoneTTL ceiling to safely cover any session lifetime
+- ScanOutputFormat cast to OutputFormat in Invoke(): type safety at builder level, server receives standard output_format field
+- WaitForScanResult reuses resultCh signaling — avoids new channel, consistent with WaitForResult pattern
+- Dual JSON unmarshal in WebSocket handler ([]ResultItem then ScanResult): photo/signature flows unchanged
 
 ### Pending Todos
 
@@ -73,5 +76,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 05-01-PLAN.md — scan model types, phpdave11/gofpdf migration, store extension
+Stopped at: Completed 05-03-PLAN.md — client library scan support (ActionTypeScan, ScanDocumentMode, ScanOutputFormat, WaitForScanResult)
 Resume file: None

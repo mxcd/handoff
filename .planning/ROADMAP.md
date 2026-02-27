@@ -95,6 +95,8 @@ Plans:
 
 Plans:
 - [x] 05-01: Scan model types, phpdave11/gofpdf migration with ImagesToPDF, store scan page accumulation
+- [x] 05-02: Scan session creation, multipart upload endpoints, PDF assembly, result delivery with nested documents
+- [x] 05-03: Go client library scan support — ActionTypeScan, ScanDocumentMode, ScanOutputFormat, WaitForScanResult
 
 #### Phase 6: Scan Capture and Crop UI
 **Goal**: A phone user can capture document pages via the device camera, manually crop each page with 4-corner handles and an offset magnifying glass, preview the perspective-corrected result, manage multiple pages and documents, and submit the completed scan to the server
@@ -122,5 +124,5 @@ Phases execute in numeric order: 5 → 6
 | 2. Session Core | v1.0 | 4/4 | Complete | 2026-02-26 |
 | 3. Phone UI and Actions | v1.0 | 4/4 | Complete | 2026-02-26 |
 | 4. Client Library and Dev Tools | v1.0 | 2/2 | Complete | 2026-02-26 |
-| 5. Scan Server Infrastructure | v1.1 | 1/TBD | In progress | - |
+| 5. Scan Server Infrastructure | v1.1 | 3/TBD | In progress | - |
 | 6. Scan Capture and Crop UI | v1.1 | 0/TBD | Not started | - |
