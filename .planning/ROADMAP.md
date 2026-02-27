@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** - Phases 1-4 (shipped 2026-02-26)
-- 🚧 **v1.1 Document Scanning** - Phases 5-6 (in progress)
+- ✅ **v1.1 Document Scanning** - Phases 5-6 (shipped 2026-02-27)
 
 ## Phases
 
@@ -77,7 +77,7 @@ Plans:
 
 </details>
 
-### 🚧 v1.1 Document Scanning (In Progress)
+### ✅ v1.1 Document Scanning (Shipped 2026-02-27)
 
 **Milestone Goal:** Add document scanning as a first-class action type — manual 4-corner crop, client-side perspective warp, multi-page capture, multi-document grouping, server-side PDF assembly, and nested result structure.
 
@@ -113,7 +113,7 @@ Plans:
 Plans:
 - [x] 06-01: Server template data, camera capture with EXIF normalization, crop canvas with L-bracket handles, dim overlay, and magnifying glass
 - [x] 06-02: Homography.js perspective warp, preview screen (Accept/Re-crop/Retake), single-page upload+finalize flow
-- [ ] 06-03: Filmstrip thumbnail strip with reorder/delete, document boundaries, review screen, batch upload+finalize
+- [x] 06-03: Filmstrip thumbnail strip with reorder/delete, document boundaries, review screen, batch upload+finalize
 
 ## Progress
 
@@ -126,5 +126,5 @@ Phases execute in numeric order: 5 → 6
 | 2. Session Core | v1.0 | 4/4 | Complete | 2026-02-26 |
 | 3. Phone UI and Actions | v1.0 | 4/4 | Complete | 2026-02-26 |
 | 4. Client Library and Dev Tools | v1.0 | 2/2 | Complete | 2026-02-26 |
-| 5. Scan Server Infrastructure | v1.1 | 3/TBD | In progress | - |
-| 6. Scan Capture and Crop UI | v1.1 | 2/3 | In progress | - |
+| 5. Scan Server Infrastructure | v1.1 | 3/3 | Complete | 2026-02-27 |
+| 6. Scan Capture and Crop UI | v1.1 | 3/3 | Complete | 2026-02-27 |

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Document Scanning
 status: unknown
-last_updated: "2026-02-27T17:18:00Z"
+last_updated: "2026-02-27T16:46:17Z"
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 17
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** A calling backend can create a session, generate a QR code URL, and receive the completed action result (scan, photo, signature) — reliably and without requiring the calling app to build any mobile-facing UI.
-**Current focus:** Phase 6 — Scan Capture and Crop UI
+**Current focus:** Milestone v1.0 complete — Document Scanning
 
 ## Current Position
 
-Phase: 6 of 6 (Scan Capture and Crop UI)
-Plan: 2 of TBD in current phase
-Status: In progress
-Last activity: 2026-02-27 — Completed 06-02 (Homography.js perspective warp, preview screen, single-page upload+finalize flow)
+Phase: 6 of 6 (Scan Capture and Crop UI) — COMPLETE
+Plan: 3 of 3 in phase 6
+Status: Complete
+Last activity: 2026-02-27 — Completed 06-03 (filmstrip, drag-reorder, review screen, batch upload+finalize)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -41,7 +41,7 @@ Progress: [█████░░░░░] 50%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 05-scan-server-infrastructure | 3 | 9 min | 3 min |
-| 06-scan-capture-and-crop-ui | 2 | 6 min | 3 min |
+| 06-scan-capture-and-crop-ui | 3 | 9 min | 3 min |
 
 *Updated after each plan completion*
 
@@ -74,6 +74,9 @@ Recent decisions affecting current work:
 - script type=module for ESM Homography.js; window.* exports for onclick compatibility
 - Warp output sized from quad edge lengths (max of opposite sides), capped at 1500px long side
 - acceptPage() handles 410 (expired) and 409 (completed) as special redirects, not errors
+- renderFilmstrip() rebuilds entire filmstrip DOM from pages[] on each change — simple, correct, no stale state
+- Long-press drag does NOT call preventDefault on pointerdown — preserves horizontal scroll behavior
+- reorderPages() adjusts target index for removed element to avoid off-by-one
 
 ### Pending Todos
 
@@ -86,5 +89,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 06-02-PLAN.md — Homography.js warp, preview screen, single-page upload+finalize
+Stopped at: Completed 06-03-PLAN.md — filmstrip, drag-reorder, review screen, batch upload+finalize
 Resume file: None
