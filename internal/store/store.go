@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	tombstoneTTL   = 24 * time.Hour
-	sessionKeyFmt  = "session:%s"
+	tombstoneTTL    = 24 * time.Hour
+	sessionKeyFmt   = "session:%s"
 	tombstoneKeyFmt = "tombstone:%s"
-	fileKeyFmt     = "file:%s"
-	defaultExpiry  = cache.NoExpiration
+	fileKeyFmt      = "file:%s"
+	scanPagesKeyFmt = "scanpages:%s"
+	defaultExpiry   = cache.NoExpiration
 	cleanupInterval = time.Minute
 )
 
@@ -22,12 +23,22 @@ const (
 // Sessions expire according to their SessionTTL. Tombstones linger for 24 hours
 // after session expiry so callers can distinguish "expired" from "never existed".
 // Result files expire independently according to the session's ResultTTL.
+// Scan pages accumulate until finalization or expiry.
 type Store struct {
-	sessions *cache.Cache // keyed by "session:{id}"
-	files    *cache.Cache // keyed by "file:{downloadID}"
+	sessions  *cache.Cache // keyed by "session:{id}"
+	files     *cache.Cache // keyed by "file:{downloadID}"
+	scanPages *cache.Cache // keyed by "scanpages:{sessionID}", stores []ScanPageData
 }
 
-// NewStore creates a new Store with separate caches for sessions and files.
+// ScanPageData holds raw uploaded page data before finalization.
+type ScanPageData struct {
+	DocumentIndex int
+	PageIndex     int
+	Data          []byte
+	ContentType   string
+}
+
+// NewStore creates a new Store with separate caches for sessions, files, and scan pages.
 // The session cache retains tombstone entries for up to 24 hours.
 // The file cache uses a 5-minute default expiry.
 func NewStore() *Store {
@@ -36,6 +47,8 @@ func NewStore() *Store {
 		sessions: cache.New(tombstoneTTL, cleanupInterval),
 		// 5-minute default expiry for files; cleanup every minute.
 		files: cache.New(5*time.Minute, cleanupInterval),
+		// scan pages live as long as the session; cleanup every minute.
+		scanPages: cache.New(tombstoneTTL, cleanupInterval),
 	}
 }
 
@@ -52,6 +65,11 @@ func tombstoneKey(id string) string {
 // fileKey returns the cache key for the given download ID.
 func fileKey(downloadID string) string {
 	return fmt.Sprintf(fileKeyFmt, downloadID)
+}
+
+// scanPagesKey returns the cache key for the accumulated scan pages of a session.
+func scanPagesKey(sessionID string) string {
+	return fmt.Sprintf(scanPagesKeyFmt, sessionID)
 }
 
 // CreateSession stores a new session in the cache with its SessionTTL.
@@ -163,6 +181,25 @@ func (s *Store) MarkSessionCompleted(id string, result []model.ResultItem) error
 	return s.UpdateSession(sess)
 }
 
+// MarkScanSessionCompleted sets the session status to "completed" with a scan result.
+func (s *Store) MarkScanSessionCompleted(id string, scanResult *model.ScanResult) error {
+	sess, err := s.GetSession(id)
+	if err != nil {
+		return err
+	}
+	if sess == nil {
+		return fmt.Errorf("session %q not found", id)
+	}
+
+	now := time.Now()
+	sess.Status = model.SessionStatusCompleted
+	sess.CompletedAt = &now
+	sess.ScanResult = scanResult
+
+	log.Debug().Str("session_id", id).Int("documents", len(scanResult.Documents)).Msg("store: marking scan session completed")
+	return s.UpdateSession(sess)
+}
+
 // StoredFile holds binary file data together with its MIME content type.
 type StoredFile struct {
 	Data        []byte
@@ -188,4 +225,42 @@ func (s *Store) GetFile(downloadID string) (*StoredFile, error) {
 	sf := v.(*StoredFile)
 	log.Debug().Str("download_id", downloadID).Int("bytes", len(sf.Data)).Msg("store: file retrieved")
 	return sf, nil
+}
+
+// AddScanPage appends a page to the accumulated scan pages for a session.
+// The TTL is set to match the session's remaining TTL.
+func (s *Store) AddScanPage(sessionID string, page ScanPageData, ttl time.Duration) error {
+	key := scanPagesKey(sessionID)
+	var pages []ScanPageData
+	if v, found := s.scanPages.Get(key); found {
+		pages = v.([]ScanPageData)
+	}
+	pages = append(pages, page)
+	s.scanPages.Set(key, pages, ttl)
+	log.Debug().Str("session_id", sessionID).Int("document_index", page.DocumentIndex).Int("page_index", page.PageIndex).Int("total_pages", len(pages)).Msg("store: scan page added")
+	return nil
+}
+
+// GetScanPages returns all accumulated scan pages for a session.
+func (s *Store) GetScanPages(sessionID string) ([]ScanPageData, error) {
+	v, found := s.scanPages.Get(scanPagesKey(sessionID))
+	if !found {
+		return nil, nil
+	}
+	return v.([]ScanPageData), nil
+}
+
+// GetScanPageCount returns the number of accumulated scan pages for a session.
+func (s *Store) GetScanPageCount(sessionID string) int {
+	v, found := s.scanPages.Get(scanPagesKey(sessionID))
+	if !found {
+		return 0
+	}
+	return len(v.([]ScanPageData))
+}
+
+// ClearScanPages removes all accumulated scan pages for a session.
+func (s *Store) ClearScanPages(sessionID string) {
+	s.scanPages.Delete(scanPagesKey(sessionID))
+	log.Debug().Str("session_id", sessionID).Msg("store: scan pages cleared")
 }

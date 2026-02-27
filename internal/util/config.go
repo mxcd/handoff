@@ -23,6 +23,10 @@ func InitConfig() error {
 
 		// base URL for generating session URLs (required)
 		config.String("BASE_URL").NotEmpty(),
+
+		// scan upload limits
+		config.Int("SCAN_UPLOAD_MAX_BYTES").Default(20971520), // 20 MB (20 * 1024 * 1024)
+		config.Int("SCAN_MAX_PAGES").Default(50),
 	})
 	return err
 }
