@@ -13,7 +13,51 @@ const (
 	ActionTypePhoto ActionType = "photo"
 	// ActionTypeSignature requests the user to provide a signature.
 	ActionTypeSignature ActionType = "signature"
+	// ActionTypeScan requests the user to scan a document.
+	ActionTypeScan ActionType = "scan"
 )
+
+// ScanDocumentMode specifies whether a scan session captures a single document or multiple.
+type ScanDocumentMode string
+
+const (
+	// ScanDocumentModeSingle captures one document with one or more pages.
+	ScanDocumentModeSingle ScanDocumentMode = "single"
+	// ScanDocumentModeMulti captures multiple documents, each with pages.
+	ScanDocumentModeMulti ScanDocumentMode = "multi"
+)
+
+// ScanOutputFormat specifies the output format for scan results.
+type ScanOutputFormat string
+
+const (
+	// ScanOutputFormatPDF assembles pages into a single PDF per document.
+	ScanOutputFormatPDF ScanOutputFormat = "pdf"
+	// ScanOutputFormatImages returns individual page images.
+	ScanOutputFormatImages ScanOutputFormat = "images"
+)
+
+// ScanPageResult represents a single page in a scan document result.
+type ScanPageResult struct {
+	// URL is the download URL for this page image.
+	URL string `json:"url"`
+	// ContentType is the MIME type of the page image.
+	ContentType string `json:"content_type"`
+}
+
+// ScanDocumentResult represents a single document in a scan result.
+type ScanDocumentResult struct {
+	// PDFURL is the download URL for the assembled PDF (present when output_format is "pdf").
+	PDFURL string `json:"pdf_url,omitempty"`
+	// Pages is the list of page images (present when output_format is "images").
+	Pages []ScanPageResult `json:"pages,omitempty"`
+}
+
+// ScanResult represents the complete scan result with nested documents.
+type ScanResult struct {
+	// Documents is the list of scanned documents.
+	Documents []ScanDocumentResult `json:"documents"`
+}
 
 // OutputFormat represents the desired output format for a session result.
 type OutputFormat string
@@ -65,6 +109,8 @@ type Event struct {
 	Status SessionStatus
 	// Result contains the result items when Type is "completed".
 	Result []ResultItem
+	// ScanResult contains the scan result when Type is "completed" and the session is a scan session.
+	ScanResult *ScanResult
 	// Timestamp is when the event occurred.
 	Timestamp time.Time
 }
@@ -75,8 +121,10 @@ type CreateSessionRequest struct {
 	ActionType ActionType `json:"action_type"`
 	// IntroText is optional introductory text shown to the user.
 	IntroText string `json:"intro_text,omitempty"`
-	// OutputFormat is the desired output format for the result (required).
+	// OutputFormat is the desired output format for the result (required for photo/signature; carries ScanOutputFormat value for scan sessions).
 	OutputFormat OutputFormat `json:"output_format"`
+	// DocumentMode is the document mode for scan sessions (optional, defaults to "single").
+	DocumentMode ScanDocumentMode `json:"document_mode,omitempty"`
 	// SessionTTL is the session time-to-live as a duration string, e.g., "30m".
 	SessionTTL string `json:"session_ttl,omitempty"`
 	// ResultTTL is the result time-to-live as a duration string, e.g., "5m".
@@ -85,17 +133,20 @@ type CreateSessionRequest struct {
 
 // sessionResponse is the internal representation of the server's session JSON response.
 type sessionResponse struct {
-	ID           string        `json:"id"`
-	ActionType   ActionType    `json:"action_type"`
-	Status       SessionStatus `json:"status"`
-	IntroText    string        `json:"intro_text,omitempty"`
-	OutputFormat OutputFormat  `json:"output_format"`
-	SessionTTL   int64         `json:"session_ttl"`
-	ResultTTL    int64         `json:"result_ttl"`
-	URL          string        `json:"url"`
-	CreatedAt    time.Time     `json:"created_at"`
-	CompletedAt  *time.Time    `json:"completed_at,omitempty"`
-	Result       []ResultItem  `json:"result,omitempty"`
+	ID              string           `json:"id"`
+	ActionType      ActionType       `json:"action_type"`
+	Status          SessionStatus    `json:"status"`
+	IntroText       string           `json:"intro_text,omitempty"`
+	OutputFormat    OutputFormat     `json:"output_format"`
+	DocumentMode    ScanDocumentMode `json:"document_mode,omitempty"`
+	ScanOutputFormat ScanOutputFormat `json:"scan_output_format,omitempty"`
+	SessionTTL      int64            `json:"session_ttl"`
+	ResultTTL       int64            `json:"result_ttl"`
+	URL             string           `json:"url"`
+	CreatedAt       time.Time        `json:"created_at"`
+	CompletedAt     *time.Time       `json:"completed_at,omitempty"`
+	Result          []ResultItem     `json:"result,omitempty"`
+	ScanResult      *ScanResult      `json:"scan_result,omitempty"`
 }
 
 // resultPollResponse is the response from GET /api/v1/sessions/:id/result.
@@ -103,4 +154,5 @@ type resultPollResponse struct {
 	Status      string       `json:"status"`
 	CompletedAt *time.Time   `json:"completed_at,omitempty"`
 	Items       []ResultItem `json:"items"`
+	ScanResult  *ScanResult  `json:"scan_result,omitempty"`
 }
