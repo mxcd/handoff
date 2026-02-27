@@ -1,23 +1,14 @@
 # Roadmap: Handoff
 
-## Overview
+## Milestones
 
-Four phases deliver a working Handoff server: clean infrastructure and auth, then session lifecycle and result delivery, then phone UI and actions, then the Go client library and dev tooling. Each phase delivers a coherent, independently verifiable capability.
+- ✅ **v1.0 MVP** - Phases 1-4 (shipped 2026-02-26)
+- 🚧 **v1.1 Document Scanning** - Phases 5-6 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 1: Foundation** - Clean Go server, infrastructure endpoints, API key auth, in-memory cache wired up
-- [x] **Phase 2: Session Core** - Caller can create sessions, receive URLs, and retrieve results via poll or WebSocket
-- [x] **Phase 3: Phone UI and Actions** - Phone user can open a session URL, see the action UI, and complete photo or signature actions
-- [x] **Phase 4: Client Library and Dev Tools** - Go client library in pkg/ and mock consumer server for end-to-end testing
-
-## Phase Details
+<details>
+<summary>✅ v1.0 MVP (Phases 1-4) - SHIPPED 2026-02-26</summary>
 
 ### Phase 1: Foundation
 **Goal**: A running Go server with infrastructure endpoints, API key authentication, and in-memory session store ready for use
@@ -28,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Server shuts down cleanly on SIGINT/SIGTERM without dropping in-flight requests
   3. A request with a valid API key is accepted; a request with a missing or invalid key is rejected with 401
   4. Static assets are served from the embedded binary (no external files required at runtime)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 - [x] 01-01: Scaffold cleanup — remove defector imports, wire Handoff-specific structure
@@ -45,7 +36,7 @@ Plans:
   3. Caller receives a WebSocket notification the moment a session completes
   4. Sessions that exceed their TTL are no longer accessible; result availability expires independently after its own TTL
   5. All session state lives in-memory with no database dependency
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 - [x] 02-01: Session/result model, in-memory store via go-cache, TTL expiry and tombstones
@@ -63,7 +54,7 @@ Plans:
   3. Phone user can capture a photo via the device camera and the photo is submitted to the Handoff backend
   4. Phone user sees a full-screen touch signature field, can undo and redo strokes, and the completed signature is submitted to the backend
   5. The action UI rendered matches the action type specified when the session was created
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 - [x] 03-01: Go HTML template system, routing for session UI, expired session page
@@ -78,20 +69,58 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. A Go application can import pkg/ and create sessions, receive URLs, and poll or subscribe for results without writing raw HTTP calls
   2. The mock consumer server starts, creates a session, displays the QR code URL, and receives the completed result — providing a full local e2e test harness
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [x] 04-01: Go client library in pkg/ — types, errors, client with builder pattern, session with WebSocket subscription
 - [x] 04-02: Mock consumer server — browser dashboard with session creation, QR display, live status, result preview
 
+</details>
+
+### 🚧 v1.1 Document Scanning (In Progress)
+
+**Milestone Goal:** Add document scanning as a first-class action type — manual 4-corner crop, client-side perspective warp, multi-page capture, multi-document grouping, server-side PDF assembly, and nested result structure.
+
+#### Phase 5: Scan Server Infrastructure
+**Goal**: The server fully supports scan sessions end-to-end — session creation, multipart upload, PDF assembly, nested result delivery, body size limits, PDF library migration, and Go client library scan support — so the phone UI phase can build against a complete, stable server contract
+**Depends on**: Phase 4
+**Requirements**: SCAN-01, SCAN-02, SCAN-03, INFR-11, INFR-12, RESL-11, RESL-12, RESL-13, RESL-14, CLIB-01, CLIB-02
+**Success Criteria** (what must be TRUE):
+  1. Caller can create a scan session specifying single or multi-document mode and PDF or image output format; existing photo and signature sessions are unchanged
+  2. Server accepts multipart/form-data scan page uploads, stores pages per session and document boundary, and enforces a configurable request body size limit
+  3. When output format is PDF, server assembles all pages of each document into a single multi-page PDF; when format is images, server returns individual page files — both delivered via the nested `documents` array in the API response
+  4. A Go application can use pkg/ to create scan sessions with document mode and output format options, and parse a typed nested scan result without writing raw HTTP or JSON code
+  5. Server builds and all tests pass with `phpdave11/gofpdf` replacing the archived `jung-kurt/gofpdf`
+**Plans**: TBD
+
+Plans:
+- [x] 05-01: Scan model types, phpdave11/gofpdf migration with ImagesToPDF, store scan page accumulation
+
+#### Phase 6: Scan Capture and Crop UI
+**Goal**: A phone user can capture document pages via the device camera, manually crop each page with 4-corner handles and an offset magnifying glass, preview the perspective-corrected result, manage multiple pages and documents, and submit the completed scan to the server
+**Depends on**: Phase 5
+**Requirements**: CAPT-01, CAPT-02, CAPT-03, CROP-01, CROP-02, CROP-03, CROP-04, CROP-05, PAGE-01, PAGE-02, PAGE-03, DOCS-01, DOCS-02
+**Success Criteria** (what must be TRUE):
+  1. Phone user captures a document photo and the image displays upright in the crop UI regardless of device orientation at capture time (EXIF normalization applied)
+  2. Phone user sees 4 draggable corner handles positioned outside the document corners; an offset magnifying glass appears while dragging to show the exact corner position under the finger
+  3. Phone user sees a perspective-corrected flat preview of the cropped document and can either accept it or return to re-crop
+  4. In multi-page mode, phone user can capture additional pages, review all pages, remove any page, and choose single-page or multi-page mode before starting
+  5. In multi-document mode, phone user can separate document boundaries with a "Next Document" button, review all documents and pages, and submit the complete multi-document scan
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 5 → 6
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Foundation | 3/3 | Complete | 2026-02-26 |
-| 2. Session Core | 4/4 | Complete | 2026-02-26 |
-| 3. Phone UI and Actions | 4/4 | Complete | 2026-02-26 |
-| 4. Client Library and Dev Tools | 2/2 | Complete | 2026-02-26 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Foundation | v1.0 | 3/3 | Complete | 2026-02-26 |
+| 2. Session Core | v1.0 | 4/4 | Complete | 2026-02-26 |
+| 3. Phone UI and Actions | v1.0 | 4/4 | Complete | 2026-02-26 |
+| 4. Client Library and Dev Tools | v1.0 | 2/2 | Complete | 2026-02-26 |
+| 5. Scan Server Infrastructure | v1.1 | 1/TBD | In progress | - |
+| 6. Scan Capture and Crop UI | v1.1 | 0/TBD | Not started | - |
