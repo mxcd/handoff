@@ -260,5 +260,213 @@ window.addEventListener('resize', () => {
     drawCropFrame();
   }
 });
+
+// ===== Crop frame rendering =====
+const HIT_RADIUS    = 30; // px — touch target radius for corner hit detection
+const BRACKET_LEN   = 20; // px — length of each L-bracket arm
+const BRACKET_WIDTH = 3;  // px — L-bracket stroke width
+const LINE_WIDTH    = 1.5;// px — connecting quad line width
+const OVERLAY_ALPHA = 0.45;
+
+function drawCropFrame() {
+  if (!currentSourceCanvas || cropPoints.length < 4) return;
+
+  const ctx = cropCtx;
+  const cw  = cropCanvas.width;
+  const ch  = cropCanvas.height;
+
+  // Map crop points from image coords to canvas CSS-pixel coords
+  const pts = cropPoints.map(([x, y]) => [
+    x * scale + offsetX,
+    y * scale + offsetY,
+  ]);
+
+  // 1. Clear and draw source image (letterboxed)
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.drawImage(currentSourceCanvas, offsetX, offsetY, drawW, drawH);
+
+  // 2. Semi-transparent dark overlay over entire canvas
+  ctx.fillStyle = 'rgba(0,0,0,' + OVERLAY_ALPHA + ')';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // 3. Punch out the crop quad using destination-out
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,0,0,1)';
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 4. Re-draw source image inside the quad only (clip to quad)
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(currentSourceCanvas, offsetX, offsetY, drawW, drawH);
+  ctx.restore();
+
+  // 5. Connecting white lines around the quad
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth   = LINE_WIDTH;
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  ctx.stroke();
+
+  // 6. L-bracket corner handles
+  drawHandles(ctx, pts);
+
+  // 7. Loupe if a handle is being dragged
+  if (activeHandle !== null) {
+    const ap = pts[activeHandle];
+    drawLoupe(ctx, ap[0], ap[1]);
+  }
+}
+
+// ===== L-bracket handle drawing =====
+// Arms extend AWAY from the quad center for each corner.
+// Directions: TL(0)=left+up, TR(1)=right+up, BR(2)=right+down, BL(3)=left+down
+const CORNER_DIRS = [
+  [-1, -1], // TL: left, up
+  [ 1, -1], // TR: right, up
+  [ 1,  1], // BR: right, down
+  [-1,  1], // BL: left, down
+];
+
+function drawHandles(ctx, pts) {
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth   = BRACKET_WIDTH;
+  ctx.lineCap     = 'square';
+
+  for (let i = 0; i < 4; i++) {
+    const [cx, cy] = pts[i];
+    const [dx, dy] = CORNER_DIRS[i];
+    const L = BRACKET_LEN;
+
+    ctx.beginPath();
+    // Horizontal arm
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + dx * L, cy);
+    // Vertical arm
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx, cy + dy * L);
+    ctx.stroke();
+  }
+
+  ctx.lineCap = 'butt'; // reset
+}
+
+// ===== Magnifying glass loupe =====
+const LOUPE_R     = 50; // px radius
+const LOUPE_ZOOM  = 3;  // 3x magnification
+const LOUPE_OFFSET_X = 80; // default horizontal offset from finger
+const LOUPE_OFFSET_Y = 80; // default vertical offset (above finger)
+
+function drawLoupe(ctx, canvasX, canvasY) {
+  // Back-project canvas position to image pixel coords
+  const imgX = (canvasX - offsetX) / scale;
+  const imgY = (canvasY - offsetY) / scale;
+
+  // Smart loupe positioning: default above+right, then adjust near edges
+  let loupeX = canvasX + LOUPE_OFFSET_X;
+  let loupeY = canvasY - LOUPE_OFFSET_Y;
+
+  // Near top edge: shift loupe below
+  if (canvasY < 150) {
+    loupeY = canvasY + LOUPE_OFFSET_Y;
+  }
+  // Near right edge: shift loupe to the left
+  if (loupeX + LOUPE_R + 10 > cropCanvas.width) {
+    loupeX = canvasX - LOUPE_OFFSET_X;
+  }
+  // Near left edge: shift loupe to the right
+  if (loupeX - LOUPE_R - 10 < 0) {
+    loupeX = canvasX + LOUPE_OFFSET_X;
+  }
+
+  // Src region in the source image at 3x zoom
+  const srcW = (LOUPE_R * 2) / LOUPE_ZOOM;
+  const srcH = (LOUPE_R * 2) / LOUPE_ZOOM;
+  const srcX = imgX - srcW / 2;
+  const srcY = imgY - srcH / 2;
+
+  // Draw zoomed source image into a clipped circle
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(loupeX, loupeY, LOUPE_R, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.drawImage(
+    currentSourceCanvas,
+    srcX, srcY, srcW, srcH,          // source region
+    loupeX - LOUPE_R, loupeY - LOUPE_R, LOUPE_R * 2, LOUPE_R * 2 // dest
+  );
+  ctx.restore();
+
+  // White border around loupe
+  ctx.beginPath();
+  ctx.arc(loupeX, loupeY, LOUPE_R, 0, Math.PI * 2);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth   = 2;
+  ctx.stroke();
+
+  // Red crosshair dot at loupe center (shows exact corner position)
+  ctx.beginPath();
+  ctx.arc(loupeX, loupeY, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#f00';
+  ctx.fill();
+}
+
+// ===== Pointer events for corner dragging =====
+cropCanvas.addEventListener('pointerdown', function(e) {
+  if (cropPoints.length < 4) return;
+  const rect = cropCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  for (let i = 0; i < 4; i++) {
+    const hx = cropPoints[i][0] * scale + offsetX;
+    const hy = cropPoints[i][1] * scale + offsetY;
+    if (Math.hypot(x - hx, y - hy) < HIT_RADIUS) {
+      activeHandle = i;
+      cropCanvas.setPointerCapture(e.pointerId);
+      break;
+    }
+  }
+});
+
+cropCanvas.addEventListener('pointermove', function(e) {
+  if (activeHandle === null || cropPoints.length < 4) return;
+  const rect = cropCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  // Convert canvas CSS-pixel position back to image pixel coords, clamped to image bounds
+  const imgX = Math.max(0, Math.min(currentSourceCanvas.width,  (x - offsetX) / scale));
+  const imgY = Math.max(0, Math.min(currentSourceCanvas.height, (y - offsetY) / scale));
+  cropPoints[activeHandle] = [imgX, imgY];
+
+  drawCropFrame();
+});
+
+cropCanvas.addEventListener('pointerup', function() {
+  activeHandle = null;
+  drawCropFrame(); // redraw without loupe
+});
+
+cropCanvas.addEventListener('pointercancel', function() {
+  activeHandle = null;
+  drawCropFrame();
+});
+
+// ===== Confirm Crop (stub for plan 06-02) =====
+function confirmCrop() {
+  // Plan 06-02 will implement perspective warp + preview here.
+  console.log('crop confirmed', cropPoints.map(([x, y]) => [Math.round(x), Math.round(y)]));
+}
 </script>
 {{end}}
