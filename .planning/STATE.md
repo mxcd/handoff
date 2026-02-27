@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Document Scanning
 status: unknown
-last_updated: "2026-02-27T16:05:26.996Z"
+last_updated: "2026-02-27T16:35:00Z"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 17
+  completed_plans: 17
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** A calling backend can create a session, generate a QR code URL, and receive the completed action result (scan, photo, signature) — reliably and without requiring the calling app to build any mobile-facing UI.
-**Current focus:** Phase 5 — Scan Server Infrastructure
+**Current focus:** Phase 6 — Scan Capture and Crop UI
 
 ## Current Position
 
-Phase: 5 of 6 (Scan Server Infrastructure)
-Plan: 3 of TBD in current phase
+Phase: 6 of 6 (Scan Capture and Crop UI)
+Plan: 1 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-27 — Completed 05-03 (client library scan support)
+Last activity: 2026-02-27 — Completed 06-01 (scan capture + crop UI with L-bracket handles and magnifier)
 
-Progress: [███░░░░░░░] 30%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -41,6 +41,7 @@ Progress: [███░░░░░░░] 30%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 05-scan-server-infrastructure | 3 | 9 min | 3 min |
+| 06-scan-capture-and-crop-ui | 1 | 3 min | 3 min |
 
 *Updated after each plan completion*
 
@@ -66,6 +67,10 @@ Recent decisions affecting current work:
 - Dual JSON unmarshal in WebSocket handler ([]ResultItem then ScanResult): photo/signature flows unchanged
 - Finalize endpoint on /s/:id/scan/finalize (public, phone-facing) — mirrors /s/:id/result; session UUID provides security
 - Page limit response: structured JSON {error, limit, current} for actionable client feedback
+- EXIF normalization: CSS image-orientation: from-image on hidden img + drawImage to offscreen canvas (zero JS weight; exifr not needed)
+- Canvas coords NOT multiplied by devicePixelRatio — CSS pixel coordinate space for simpler hit testing
+- cropPoints stored in image pixel space for downstream Homography.js warp in plan 06-02
+- accept="image/*" without capture attribute — Android 14/15 Chrome hides camera with capture attr
 
 ### Pending Todos
 
@@ -73,10 +78,10 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 6 (Scan UI): EXIF library choice (exifr vs. manual parsing) needs decision before implementation — flag for phase research
+None.
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 05-02-PLAN.md — scan upload/finalize endpoints, result delivery with scan_result
+Stopped at: Completed 06-01-PLAN.md — scan capture + crop UI, EXIF normalization, L-bracket handles, magnifier
 Resume file: None

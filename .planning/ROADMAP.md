@@ -111,7 +111,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: Server template data, camera capture with EXIF normalization, crop canvas with L-bracket handles, dim overlay, and magnifying glass
+- [x] 06-01: Server template data, camera capture with EXIF normalization, crop canvas with L-bracket handles, dim overlay, and magnifying glass
 - [ ] 06-02: Homography.js perspective warp, preview screen (Accept/Re-crop/Retake), single-page upload+finalize flow
 - [ ] 06-03: Filmstrip thumbnail strip with reorder/delete, document boundaries, review screen, batch upload+finalize
 
