@@ -64,6 +64,8 @@ Recent decisions affecting current work:
 - ScanOutputFormat cast to OutputFormat in Invoke(): type safety at builder level, server receives standard output_format field
 - WaitForScanResult reuses resultCh signaling — avoids new channel, consistent with WaitForResult pattern
 - Dual JSON unmarshal in WebSocket handler ([]ResultItem then ScanResult): photo/signature flows unchanged
+- Finalize endpoint on /s/:id/scan/finalize (public, phone-facing) — mirrors /s/:id/result; session UUID provides security
+- Page limit response: structured JSON {error, limit, current} for actionable client feedback
 
 ### Pending Todos
 
@@ -76,5 +78,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 05-03-PLAN.md — client library scan support (ActionTypeScan, ScanDocumentMode, ScanOutputFormat, WaitForScanResult)
+Stopped at: Completed 05-02-PLAN.md — scan upload/finalize endpoints, result delivery with scan_result
 Resume file: None
