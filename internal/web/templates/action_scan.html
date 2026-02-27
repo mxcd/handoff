@@ -57,16 +57,33 @@
 }
 .btn-confirm-crop:active { opacity: 0.85; }
 
-/* ===== Preview View (placeholder) ===== */
+/* ===== Preview View ===== */
 #previewView {
   background: #111;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 1rem;
-  opacity: 0.5;
 }
+#previewImg {
+  flex: 1;
+  width: 100%;
+  object-fit: contain;
+  display: block;
+}
+.preview-controls {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 16px 24px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+}
+.preview-btn {
+  padding: 14px 24px; border-radius: 8px; border: none;
+  font-size: 1rem; font-weight: 500; cursor: pointer;
+}
+.btn-retake-scan  { background: rgba(255,255,255,0.2); color: #fff; }
+.btn-recrop-scan  { background: rgba(255,255,255,0.12); color: #fff; }
+.btn-accept-scan  { background: #fff; color: #111; font-weight: 600; }
+.preview-btn:active { opacity: 0.8; }
 
 /* ===== Review View (placeholder) ===== */
 #reviewView {
@@ -94,11 +111,16 @@
   align-items: center;
   justify-content: center;
   z-index: 200;
+  flex-direction: column;
+  gap: 16px;
 }
 .spinner {
   width: 52px; height: 52px; border: 4px solid rgba(255,255,255,0.3);
   border-top-color: #fff; border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+#spinnerLabel {
+  color: #fff; font-size: 0.95rem; opacity: 0.85;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 {{end}}
@@ -111,7 +133,7 @@
     <label class="capture-label" for="scanCameraInput">
       <svg viewBox="0 0 24 24">
         <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
-        <path d="M9 2 7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
+        <path d="M9 2 7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
       </svg>
     </label>
     <input type="file" id="scanCameraInput" class="capture-input" accept="image/*">
@@ -122,13 +144,18 @@
 <div class="scan-screen" id="cropView">
   <canvas id="cropCanvas"></canvas>
   <div class="crop-controls">
-    <button class="btn-confirm-crop" onclick="confirmCrop()">Confirm</button>
+    <button class="btn-confirm-crop" onclick="window.confirmCrop()">Confirm</button>
   </div>
 </div>
 
-<!-- Preview View (placeholder — implemented in 06-02) -->
+<!-- Preview View -->
 <div class="scan-screen" id="previewView">
-  <p>Preview — coming in plan 06-02</p>
+  <img id="previewImg" alt="Scanned document preview">
+  <div class="preview-controls">
+    <button class="preview-btn btn-retake-scan" onclick="window.retakeScan()">Retake</button>
+    <button class="preview-btn btn-recrop-scan" onclick="window.recropScan()">Re-crop</button>
+    <button class="preview-btn btn-accept-scan" id="acceptBtn" onclick="window.acceptPage()">Accept</button>
+  </div>
 </div>
 
 <!-- Review View (placeholder — implemented in 06-03) -->
@@ -142,11 +169,14 @@
 <!-- Spinner Overlay -->
 <div class="scan-screen" id="spinnerView">
   <div class="spinner"></div>
+  <span id="spinnerLabel"></span>
 </div>
 {{end}}
 
 {{define "scripts"}}
-<script>
+<script type="module">
+import { Homography } from "https://cdn.jsdelivr.net/gh/Eric-Canas/Homography.js@1.8.1/Homography.js";
+
 // ===== Template data =====
 const sessionID   = '{{.SessionID}}';
 const documentMode = '{{.ScanDocumentMode}}';
@@ -164,9 +194,18 @@ let scale   = 1;
 let offsetX = 0, offsetY = 0;
 let drawW   = 0, drawH   = 0;
 
+// ===== Multi-page / warp state =====
+let pages = [];               // [{docIndex, blob, thumbnailURL}]
+let currentDocIndex = 0;
+let currentWarpedBlob = null;
+let currentThumbnailURL = null;
+
 // ===== DOM refs =====
 const cropCanvas   = document.getElementById('cropCanvas');
 const cropCtx      = cropCanvas.getContext('2d');
+const previewImg   = document.getElementById('previewImg');
+const acceptBtn    = document.getElementById('acceptBtn');
+const spinnerLabel = document.getElementById('spinnerLabel');
 
 // ===== Screen switcher =====
 const ALL_SCREENS = ['captureView', 'cropView', 'previewView', 'reviewView', 'spinnerView'];
@@ -181,6 +220,14 @@ function showScreen(name) {
         : name === 'previewView' ? 'preview'
         : name === 'reviewView'  ? 'review'
         : state;
+}
+
+function showSpinner(label) {
+  spinnerLabel.textContent = label || '';
+  ALL_SCREENS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', id === 'spinnerView');
+  });
 }
 
 // ===== Camera input =====
@@ -235,10 +282,9 @@ function initCropPoints(w, h) {
 // ===== Crop canvas sizing =====
 function resizeCropCanvas() {
   if (!currentSourceCanvas) return;
-  // Canvas size = the CSS-pixel size of the element
   const rect = cropCanvas.getBoundingClientRect();
   cropCanvas.width  = rect.width  || window.innerWidth;
-  cropCanvas.height = rect.height || (window.innerHeight - 0); // controls overlay, not above
+  cropCanvas.height = rect.height || window.innerHeight;
   recalcLayout();
 }
 
@@ -329,8 +375,6 @@ function drawCropFrame() {
 }
 
 // ===== L-bracket handle drawing =====
-// Arms extend AWAY from the quad center for each corner.
-// Directions: TL(0)=left+up, TR(1)=right+up, BR(2)=right+down, BL(3)=left+down
 const CORNER_DIRS = [
   [-1, -1], // TL: left, up
   [ 1, -1], // TR: right, up
@@ -368,53 +412,44 @@ const LOUPE_OFFSET_X = 80; // default horizontal offset from finger
 const LOUPE_OFFSET_Y = 80; // default vertical offset (above finger)
 
 function drawLoupe(ctx, canvasX, canvasY) {
-  // Back-project canvas position to image pixel coords
   const imgX = (canvasX - offsetX) / scale;
   const imgY = (canvasY - offsetY) / scale;
 
-  // Smart loupe positioning: default above+right, then adjust near edges
   let loupeX = canvasX + LOUPE_OFFSET_X;
   let loupeY = canvasY - LOUPE_OFFSET_Y;
 
-  // Near top edge: shift loupe below
   if (canvasY < 150) {
     loupeY = canvasY + LOUPE_OFFSET_Y;
   }
-  // Near right edge: shift loupe to the left
   if (loupeX + LOUPE_R + 10 > cropCanvas.width) {
     loupeX = canvasX - LOUPE_OFFSET_X;
   }
-  // Near left edge: shift loupe to the right
   if (loupeX - LOUPE_R - 10 < 0) {
     loupeX = canvasX + LOUPE_OFFSET_X;
   }
 
-  // Src region in the source image at 3x zoom
   const srcW = (LOUPE_R * 2) / LOUPE_ZOOM;
   const srcH = (LOUPE_R * 2) / LOUPE_ZOOM;
   const srcX = imgX - srcW / 2;
   const srcY = imgY - srcH / 2;
 
-  // Draw zoomed source image into a clipped circle
   ctx.save();
   ctx.beginPath();
   ctx.arc(loupeX, loupeY, LOUPE_R, 0, Math.PI * 2);
   ctx.clip();
   ctx.drawImage(
     currentSourceCanvas,
-    srcX, srcY, srcW, srcH,          // source region
-    loupeX - LOUPE_R, loupeY - LOUPE_R, LOUPE_R * 2, LOUPE_R * 2 // dest
+    srcX, srcY, srcW, srcH,
+    loupeX - LOUPE_R, loupeY - LOUPE_R, LOUPE_R * 2, LOUPE_R * 2
   );
   ctx.restore();
 
-  // White border around loupe
   ctx.beginPath();
   ctx.arc(loupeX, loupeY, LOUPE_R, 0, Math.PI * 2);
   ctx.strokeStyle = '#fff';
   ctx.lineWidth   = 2;
   ctx.stroke();
 
-  // Red crosshair dot at loupe center (shows exact corner position)
   ctx.beginPath();
   ctx.arc(loupeX, loupeY, 3, 0, Math.PI * 2);
   ctx.fillStyle = '#f00';
@@ -445,7 +480,6 @@ cropCanvas.addEventListener('pointermove', function(e) {
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  // Convert canvas CSS-pixel position back to image pixel coords, clamped to image bounds
   const imgX = Math.max(0, Math.min(currentSourceCanvas.width,  (x - offsetX) / scale));
   const imgY = Math.max(0, Math.min(currentSourceCanvas.height, (y - offsetY) / scale));
   cropPoints[activeHandle] = [imgX, imgY];
@@ -455,7 +489,7 @@ cropCanvas.addEventListener('pointermove', function(e) {
 
 cropCanvas.addEventListener('pointerup', function() {
   activeHandle = null;
-  drawCropFrame(); // redraw without loupe
+  drawCropFrame();
 });
 
 cropCanvas.addEventListener('pointercancel', function() {
@@ -463,10 +497,180 @@ cropCanvas.addEventListener('pointercancel', function() {
   drawCropFrame();
 });
 
-// ===== Confirm Crop (stub for plan 06-02) =====
-function confirmCrop() {
-  // Plan 06-02 will implement perspective warp + preview here.
-  console.log('crop confirmed', cropPoints.map(([x, y]) => [Math.round(x), Math.round(y)]));
+// ===== Confirm Crop: perspective warp via Homography.js =====
+async function confirmCrop() {
+  if (!currentSourceCanvas || cropPoints.length < 4) return;
+
+  showSpinner('Processing...');
+
+  try {
+    const W = currentSourceCanvas.width;
+    const H = currentSourceCanvas.height;
+
+    // Compute output dimensions from edge lengths
+    const [tl, tr, br, bl] = cropPoints;
+    const topLen    = Math.hypot(tr[0] - tl[0], tr[1] - tl[1]);
+    const leftLen   = Math.hypot(bl[0] - tl[0], bl[1] - tl[1]);
+    const bottomLen = Math.hypot(br[0] - bl[0], br[1] - bl[1]);
+    const rightLen  = Math.hypot(br[0] - tr[0], br[1] - tr[1]);
+    const outW = Math.round(Math.max(topLen, bottomLen));
+    const outH = Math.round(Math.max(leftLen, rightLen));
+
+    // Cap long side at 1500px to keep warp fast on mobile
+    const MAX_SIDE = 1500;
+    const longSide = Math.max(outW, outH);
+    const warpScale = longSide > MAX_SIDE ? MAX_SIDE / longSide : 1;
+    const finalW = Math.round(outW * warpScale);
+    const finalH = Math.round(outH * warpScale);
+
+    // Get ImageData from source canvas
+    const srcCtx = currentSourceCanvas.getContext('2d');
+    const imageData = srcCtx.getImageData(0, 0, W, H);
+
+    // Normalize source points to 0..1 range
+    const src = cropPoints.map(([x, y]) => [x / W, y / H]);
+    // Destination = unit rectangle corners TL, TR, BR, BL
+    const dst = [[0, 0], [1, 0], [1, 1], [0, 1]];
+
+    // Perspective warp
+    const h = new Homography("projective");
+    h.setReferencePoints(src, dst, imageData);
+    const warpedImageData = h.warp();
+
+    // Render warped result to output canvas
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width  = finalW;
+    outCanvas.height = finalH;
+    const outCtx = outCanvas.getContext('2d');
+
+    // warp() returns ImageData at original ratio; scale it to finalW x finalH
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width  = warpedImageData.width;
+    tempCanvas.height = warpedImageData.height;
+    tempCanvas.getContext('2d').putImageData(warpedImageData, 0, 0);
+    outCtx.drawImage(tempCanvas, 0, 0, finalW, finalH);
+
+    // Convert to JPEG blob (0.9 quality) and store
+    currentWarpedBlob = await new Promise(resolve => {
+      outCanvas.toBlob(resolve, 'image/jpeg', 0.9);
+    });
+
+    // Generate thumbnail (max 56x64) for filmstrip in plan 06-03
+    const thumbScale = Math.min(56 / finalW, 64 / finalH);
+    const thumbW = Math.round(finalW * thumbScale);
+    const thumbH = Math.round(finalH * thumbScale);
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width  = thumbW;
+    thumbCanvas.height = thumbH;
+    thumbCanvas.getContext('2d').drawImage(outCanvas, 0, 0, thumbW, thumbH);
+    if (currentThumbnailURL) URL.revokeObjectURL(currentThumbnailURL);
+    currentThumbnailURL = await new Promise(resolve => {
+      thumbCanvas.toBlob(blob => resolve(URL.createObjectURL(blob)), 'image/jpeg', 0.8);
+    });
+
+    // Show preview
+    if (previewImg.src.startsWith('blob:')) URL.revokeObjectURL(previewImg.src);
+    previewImg.src = URL.createObjectURL(currentWarpedBlob);
+    acceptBtn.disabled = false;
+
+    showScreen('previewView');
+  } catch (err) {
+    showScreen('cropView');
+    alert('Warp failed: ' + err.message);
+  }
 }
+
+// ===== Preview actions =====
+
+function retakeScan() {
+  // Revoke URLs and clear all state, return to capture
+  if (previewImg.src.startsWith('blob:')) URL.revokeObjectURL(previewImg.src);
+  if (currentThumbnailURL) { URL.revokeObjectURL(currentThumbnailURL); currentThumbnailURL = null; }
+  currentWarpedBlob = null;
+  currentSourceCanvas = null;
+  cropPoints = [];
+  scanCameraInput.value = '';
+  showScreen('captureView');
+}
+
+function recropScan() {
+  // Return to crop UI with same source image and current crop points
+  showScreen('cropView');
+  drawCropFrame();
+}
+
+async function acceptPage() {
+  if (!currentWarpedBlob) return;
+
+  if (documentMode === 'single') {
+    // Single-page mode: upload + finalize + redirect
+    acceptBtn.disabled = true;
+    showSpinner('Uploading...');
+
+    try {
+      const fd = new FormData();
+      fd.append('file', currentWarpedBlob, 'scan.jpg');
+      fd.append('document_index', '0');
+      fd.append('page_index', '0');
+
+      const uploadResp = await fetch(uploadURL, { method: 'POST', body: fd });
+
+      if (uploadResp.status === 410) {
+        alert('Session expired.');
+        window.location.href = '/s/' + sessionID;
+        return;
+      }
+      if (uploadResp.status === 409) {
+        window.location.href = '/s/' + sessionID;
+        return;
+      }
+      if (!uploadResp.ok) {
+        const err = await uploadResp.json().catch(() => ({}));
+        throw new Error(err.error || 'Upload failed (' + uploadResp.status + ')');
+      }
+
+      const finalizeResp = await fetch(finalizeURL, { method: 'POST' });
+
+      if (finalizeResp.status === 410) {
+        alert('Session expired.');
+        window.location.href = '/s/' + sessionID;
+        return;
+      }
+      if (!finalizeResp.ok) {
+        const err = await finalizeResp.json().catch(() => ({}));
+        throw new Error(err.error || 'Finalize failed (' + finalizeResp.status + ')');
+      }
+
+      // Cleanup object URLs
+      if (previewImg.src.startsWith('blob:')) URL.revokeObjectURL(previewImg.src);
+      if (currentThumbnailURL) URL.revokeObjectURL(currentThumbnailURL);
+
+      window.location.href = '/s/' + sessionID;
+    } catch (err) {
+      showScreen('previewView');
+      acceptBtn.disabled = false;
+      alert('Submit failed: ' + err.message);
+    }
+  } else {
+    // Multi-page mode: store page and return to capture (filmstrip in plan 06-03)
+    pages.push({
+      docIndex: currentDocIndex,
+      blob: currentWarpedBlob,
+      thumbnailURL: currentThumbnailURL,
+    });
+    currentWarpedBlob = null;
+    currentThumbnailURL = null;
+    currentSourceCanvas = null;
+    cropPoints = [];
+    scanCameraInput.value = '';
+    showScreen('captureView');
+  }
+}
+
+// ===== Expose functions to window for onclick attributes =====
+window.confirmCrop = confirmCrop;
+window.retakeScan  = retakeScan;
+window.recropScan  = recropScan;
+window.acceptPage  = acceptPage;
 </script>
 {{end}}
