@@ -29,13 +29,14 @@ type Session struct {
 	// OutputFormat is the requested output format.
 	OutputFormat OutputFormat
 
-	client    *Client
-	done      chan struct{}
-	resultCh  chan []ResultItem
-	mu        sync.Mutex
-	callbacks []func(Event)
-	wsConn    *websocket.Conn
-	closed    bool
+	client     *Client
+	done       chan struct{}
+	resultCh   chan []ResultItem
+	mu         sync.Mutex
+	callbacks  []func(Event)
+	wsConn     *websocket.Conn
+	closed     bool
+	scanResult *ScanResult
 }
 
 // wsMessage is the incoming WebSocket message shape from the server.
@@ -92,6 +93,26 @@ func (s *Session) WaitForResult(ctx context.Context) ([]ResultItem, error) {
 			return nil, fmt.Errorf("handoff: session closed before completion")
 		}
 		return items, nil
+	}
+}
+
+// WaitForScanResult blocks until the session is completed or the context is cancelled.
+// Returns the scan result on completion. Use this for scan sessions instead of WaitForResult.
+func (s *Session) WaitForScanResult(ctx context.Context) (*ScanResult, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case _, ok := <-s.resultCh:
+		if !ok {
+			return nil, fmt.Errorf("handoff: session closed before completion")
+		}
+		s.mu.Lock()
+		sr := s.scanResult
+		s.mu.Unlock()
+		if sr == nil {
+			return nil, fmt.Errorf("handoff: no scan result available")
+		}
+		return sr, nil
 	}
 }
 
@@ -221,9 +242,19 @@ func (s *Session) readWebSocketMessages(conn *websocket.Conn) bool {
 		}
 
 		if msg.Type == "completed" && len(msg.Data) > 0 {
+			// Try standard result items first (photo/signature sessions).
 			var items []ResultItem
-			if err := json.Unmarshal(msg.Data, &items); err == nil {
+			if err := json.Unmarshal(msg.Data, &items); err == nil && len(items) > 0 {
 				evt.Result = items
+			} else {
+				// Try scan result (scan sessions).
+				var scanResult ScanResult
+				if err := json.Unmarshal(msg.Data, &scanResult); err == nil && len(scanResult.Documents) > 0 {
+					s.mu.Lock()
+					s.scanResult = &scanResult
+					s.mu.Unlock()
+					evt.ScanResult = &scanResult
+				}
 			}
 			s.dispatchEvent(evt)
 			select {
@@ -259,6 +290,9 @@ func (s *Session) runPolling() {
 					Result:    items,
 					Timestamp: time.Now().UTC(),
 				}
+				s.mu.Lock()
+				evt.ScanResult = s.scanResult
+				s.mu.Unlock()
 				s.dispatchEvent(evt)
 				select {
 				case s.resultCh <- items:
@@ -297,6 +331,11 @@ func (s *Session) pollResult() ([]ResultItem, bool, error) {
 	}
 
 	if SessionStatus(pollResp.Status) == SessionStatusCompleted {
+		if pollResp.ScanResult != nil {
+			s.mu.Lock()
+			s.scanResult = pollResp.ScanResult
+			s.mu.Unlock()
+		}
 		return pollResp.Items, true, nil
 	}
 

@@ -112,6 +112,10 @@ type SessionInfo struct {
 	IntroText string
 	// OutputFormat is the requested output format.
 	OutputFormat OutputFormat
+	// DocumentMode is the document mode for scan sessions.
+	DocumentMode ScanDocumentMode
+	// ScanOutputFormat is the scan output format for scan sessions.
+	ScanOutputFormat ScanOutputFormat
 	// URL is the URL for the user to open on their phone.
 	URL string
 	// CreatedAt is when the session was created.
@@ -120,6 +124,8 @@ type SessionInfo struct {
 	CompletedAt *time.Time
 	// Result contains the result items if the session is completed.
 	Result []ResultItem
+	// ScanResult contains the scan result if the session is a completed scan session.
+	ScanResult *ScanResult
 }
 
 // GetSession retrieves the current state of a session by ID.
@@ -163,12 +169,14 @@ func (c *Client) NewSession() *SessionBuilder {
 
 // SessionBuilder provides a fluent API for constructing and invoking sessions.
 type SessionBuilder struct {
-	client       *Client
-	actionType   ActionType
-	introText    string
-	outputFormat OutputFormat
-	sessionTTL   string
-	resultTTL    string
+	client          *Client
+	actionType      ActionType
+	introText       string
+	outputFormat    OutputFormat
+	documentMode    ScanDocumentMode
+	scanOutputFormat ScanOutputFormat
+	sessionTTL      string
+	resultTTL       string
 }
 
 // WithAction sets the action type for the session. This is required.
@@ -186,6 +194,20 @@ func (b *SessionBuilder) WithIntro(text string) *SessionBuilder {
 // WithOutputFormat sets the desired output format. This is required.
 func (b *SessionBuilder) WithOutputFormat(format OutputFormat) *SessionBuilder {
 	b.outputFormat = format
+	return b
+}
+
+// WithDocumentMode sets the document mode for scan sessions.
+// Only meaningful when action type is ActionTypeScan.
+func (b *SessionBuilder) WithDocumentMode(mode ScanDocumentMode) *SessionBuilder {
+	b.documentMode = mode
+	return b
+}
+
+// WithScanOutputFormat sets the output format for scan sessions.
+// Only meaningful when action type is ActionTypeScan.
+func (b *SessionBuilder) WithScanOutputFormat(format ScanOutputFormat) *SessionBuilder {
+	b.scanOutputFormat = format
 	return b
 }
 
@@ -207,16 +229,34 @@ func (b *SessionBuilder) Invoke(ctx context.Context) (*Session, error) {
 	if b.actionType == "" {
 		return nil, fmt.Errorf("handoff: action type is required (use WithAction)")
 	}
-	if b.outputFormat == "" {
-		return nil, fmt.Errorf("handoff: output format is required (use WithOutputFormat)")
-	}
 
-	reqBody := CreateSessionRequest{
-		ActionType:   b.actionType,
-		IntroText:    b.introText,
-		OutputFormat: b.outputFormat,
-		SessionTTL:   b.sessionTTL,
-		ResultTTL:    b.resultTTL,
+	var reqBody CreateSessionRequest
+	if b.actionType == ActionTypeScan {
+		// For scan sessions, output_format carries the scan-specific format.
+		// output_format is not required — defaults to "pdf".
+		scanFmt := b.scanOutputFormat
+		if scanFmt == "" {
+			scanFmt = ScanOutputFormatPDF
+		}
+		reqBody = CreateSessionRequest{
+			ActionType:   b.actionType,
+			IntroText:    b.introText,
+			OutputFormat: OutputFormat(scanFmt),
+			DocumentMode: b.documentMode,
+			SessionTTL:   b.sessionTTL,
+			ResultTTL:    b.resultTTL,
+		}
+	} else {
+		if b.outputFormat == "" {
+			return nil, fmt.Errorf("handoff: output format is required (use WithOutputFormat)")
+		}
+		reqBody = CreateSessionRequest{
+			ActionType:   b.actionType,
+			IntroText:    b.introText,
+			OutputFormat: b.outputFormat,
+			SessionTTL:   b.sessionTTL,
+			ResultTTL:    b.resultTTL,
+		}
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
@@ -243,14 +283,17 @@ func (b *SessionBuilder) Invoke(ctx context.Context) (*Session, error) {
 // sessionResponseToInfo converts an internal sessionResponse to a public SessionInfo.
 func sessionResponseToInfo(sr *sessionResponse) *SessionInfo {
 	return &SessionInfo{
-		ID:           sr.ID,
-		ActionType:   sr.ActionType,
-		Status:       sr.Status,
-		IntroText:    sr.IntroText,
-		OutputFormat: sr.OutputFormat,
-		URL:          sr.URL,
-		CreatedAt:    sr.CreatedAt,
-		CompletedAt:  sr.CompletedAt,
-		Result:       sr.Result,
+		ID:               sr.ID,
+		ActionType:       sr.ActionType,
+		Status:           sr.Status,
+		IntroText:        sr.IntroText,
+		OutputFormat:     sr.OutputFormat,
+		DocumentMode:     sr.DocumentMode,
+		ScanOutputFormat: sr.ScanOutputFormat,
+		URL:              sr.URL,
+		CreatedAt:        sr.CreatedAt,
+		CompletedAt:      sr.CompletedAt,
+		Result:           sr.Result,
+		ScanResult:       sr.ScanResult,
 	}
 }
